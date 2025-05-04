@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User{
+  id            Int             @id @default(autoincrement())
+  email         String          @unique
+  password      String
+  accounts      Account[]
+  transactions  Transaction[]
+  categories    Category[]
+  budgetMonths  BudgetMonth[]
+}
+
+model Account{
+  id            Int             @id @default(autoincrement())
+  name          String
+  balance       Int
+  user          User            @relation(fields: [userId], references: [id])
+  userId        Int
+  transactions  Transaction[]
+}
+
+model Transaction {
+  id            Int             @id @default(autoincrement())
+  amount        Int
+  description   String
+  date          DateTime        @default(now())
+  user          User            @relation(fields:[userId], references:[id])
+  userId        Int
+  account       Account         @relation(fields:[accountId], references:[id])
+  accountId     Int
+  category      Category?       @relation(fields:[categoryId], references:[id])
+  categoryId    Int?            
+}
+
+model Category {
+  id            Int             @id @default(autoincrement())
+  name          String
+  group         String?
+  user          User            @relation(fields:[userId], references:[id])
+  userId        Int
+  budgetItems   BudgetItems[]
+}
+
+model BudgetMonth {
+  id            Int             @id @default(autoincrement())
+  month         String          
+  user          User            @relation(fields:[userId], references:[id])
+  userId        Int
+  items         BudgetItems[]
+}
+
+model BudgetItems {
+  id            Int             @id @default(autoincrement())
+  amount        Int
+  spent         Int             @default(0)
+  available     Int             @default(0)
+  category      Category        @relation(fields:[categoryId], references:[id])
+  categoryId    Int
+  budgetMonth   BudgetMonth     @relation(fields: [budgetMonthId], references: [id])
+  budgetMonthId Int
+  @@unique([budgetMonthId, categoryId])
+}

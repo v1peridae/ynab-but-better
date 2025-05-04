@@ -1,0 +1,13 @@
+node_modules
+.env
+.prisma
+*.env.docker
+dist
+build
+.next
+out
+generated
+node_modules
+npm-debug.log*
+package-lock.json
+docker-compose.override.yml
