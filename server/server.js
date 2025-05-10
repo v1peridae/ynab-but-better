@@ -7,15 +7,14 @@ const bcrypt = require("bcryptjs");
 const prisma = new PrismaClient();
 const cors = require("cors");
 const helmet = require("helmet");
-const xss = require("xss-clean");
 const rateLimit = require("express-rate-limit");
 const { validationResult, body, param } = require("express-validator");
+const { router: authRouter } = require("./auth");
 
 app.use(express.json());
 
 if (process.env.NODE_ENV !== "test") {
   app.use(helmet());
-  app.use(xss());
   app.use(
     cors({
       origin: process.env.FRONTEND_URL,
@@ -33,6 +32,8 @@ if (process.env.NODE_ENV !== "test") {
 } else {
   app.use(cors());
 }
+
+app.use("/auth", authRouter);
 
 function verifyAccountOwner(req, res, next) {
   const accountId = Number(req.params.id);
@@ -64,62 +65,7 @@ function verifyTransactionOwner(req, res, next) {
     .catch(() => res.status(500).json({ error: "Internal Server Error" }));
 }
 
-app.post("/signup", [body("email").isEmail().normalizeEmail(), body("password").isLength({ min: 8 })], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-  const { email, password } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  try {
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        categories: {
-          create: [
-            { name: "Groceries", group: "Essentials" },
-            { name: "Transport", group: "Essentials" },
-            { name: "Dining Out", group: "Fun" },
-          ],
-        },
-        budgetMonths: {
-          create: {
-            month: new Date().toISOString().slice(0, 7),
-            items: {
-              create: [
-                { categoryId: 1, amount: 0 },
-                { categoryId: 2, amount: 0 },
-                { categoryId: 3, amount: 0 },
-              ],
-            },
-          },
-        },
-      },
-    });
-
-    res.status(201).json({ message: "User Created", userId: user.id });
-  } catch (error) {
-    res.status(500).json({ message: "Error creating user", error: error.message });
-  }
-});
-
-app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    return res.status(401).json({ message: "Invalid email" });
-  }
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) {
-    return res.status(401).json({ message: "Invalid password" });
-  }
-  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
-  res.json({ token });
-});
-
-function auth(req, res, next) {
+function verifyAuth(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ error: "no token" });
   try {
@@ -132,14 +78,14 @@ function auth(req, res, next) {
   }
 }
 
-app.get("/accounts", auth, async (req, res) => {
+app.get("/accounts", verifyAuth, async (req, res) => {
   const accounts = await prisma.account.findMany({
     where: { userId: req.user.userId },
   });
   res.json(accounts);
 });
 
-app.post("/transactions", auth, async (req, res) => {
+app.post("/transactions", verifyAuth, async (req, res) => {
   const { amount, accountId, description, categoryId } = req.body;
   const transaction = await prisma.transaction.create({
     data: { amount, accountId, description, categoryId, userId: req.user.userId },
@@ -189,7 +135,7 @@ app.post("/transactions", auth, async (req, res) => {
   res.status(201).json({ message: "Transaction Created", transactionId: transaction.id });
 });
 
-app.post("/accounts", auth, async (req, res) => {
+app.post("/accounts", verifyAuth, async (req, res) => {
   const { name, balance } = req.body;
   const account = await prisma.account.create({
     data: { name, balance, userId: req.user.userId },
@@ -197,7 +143,7 @@ app.post("/accounts", auth, async (req, res) => {
   res.status(201).json({ message: "Account Created", accountId: account.id });
 });
 
-app.patch("/accounts/:id", [auth, verifyAccountOwner], async (req, res) => {
+app.patch("/accounts/:id", [verifyAuth, verifyAccountOwner], async (req, res) => {
   const { name, balance } = req.body;
   const account = await prisma.account.update({
     where: { id: Number(req.params.id) },
@@ -206,21 +152,21 @@ app.patch("/accounts/:id", [auth, verifyAccountOwner], async (req, res) => {
   res.json(account);
 });
 
-app.delete("/accounts/:id", [auth, verifyAccountOwner], async (req, res) => {
+app.delete("/accounts/:id", [verifyAuth, verifyAccountOwner], async (req, res) => {
   await prisma.account.delete({
     where: { id: Number(req.params.id) },
   });
   res.json({ message: "Account Deleted" });
 });
 
-app.get("/transactions", auth, async (req, res) => {
+app.get("/transactions", verifyAuth, async (req, res) => {
   const transactions = await prisma.transaction.findMany({
     where: { userId: req.user.userId },
   });
   res.json(transactions);
 });
 
-app.patch("/transactions/:id", [auth, verifyTransactionOwner], async (req, res) => {
+app.patch("/transactions/:id", [verifyAuth, verifyTransactionOwner], async (req, res) => {
   const { amount, accountId, description } = req.body;
   const transaction = await prisma.transaction.update({
     where: { id: Number(req.params.id) },
@@ -229,21 +175,21 @@ app.patch("/transactions/:id", [auth, verifyTransactionOwner], async (req, res) 
   res.json(transaction);
 });
 
-app.delete("/transactions/:id", [auth, verifyTransactionOwner], async (req, res) => {
+app.delete("/transactions/:id", [verifyAuth, verifyTransactionOwner], async (req, res) => {
   await prisma.transaction.delete({
     where: { id: Number(req.params.id) },
   });
   res.status(204).send();
 });
 
-app.get("/categories", auth, async (req, res) => {
+app.get("/categories", verifyAuth, async (req, res) => {
   const categories = await prisma.category.findMany({
     where: { userId: req.user.userId },
   });
   res.json(categories);
 });
 
-app.post("/categories", auth, async (req, res) => {
+app.post("/categories", verifyAuth, async (req, res) => {
   const { name, group } = req.body;
   const category = await prisma.category.create({
     data: { name, group, userId: req.user.userId },
@@ -251,7 +197,7 @@ app.post("/categories", auth, async (req, res) => {
   res.status(201).json(category);
 });
 
-app.get("/budget/:month", auth, async (req, res) => {
+app.get("/budget/:month", verifyAuth, async (req, res) => {
   const month = req.params.month;
   const items = await prisma.budgetItem.findMany({
     where: {
@@ -263,7 +209,7 @@ app.get("/budget/:month", auth, async (req, res) => {
   res.json(items);
 });
 
-app.post("/budget/:month/categories/:id", auth, async (req, res) => {
+app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
   const { amount } = req.body;
   const month = req.params.month;
   const categoryId = Number(req.params.id);
@@ -315,7 +261,7 @@ app.post("/budget/:month/categories/:id", auth, async (req, res) => {
   res.status(201).json(item);
 });
 
-app.post("/budget/:month/rollover", auth, async (req, res) => {
+app.post("/budget/:month/rollover", verifyAuth, async (req, res) => {
   const month = req.params.month;
   const [yearStr, monthStr] = month.split("-");
   const nextMonth = `${yearStr}-${String(Number(monthStr) + 1).padStart(2, "0")}`;
@@ -369,7 +315,7 @@ app.post("/budget/:month/rollover", auth, async (req, res) => {
   res.json({ message: "Rollover successful" });
 });
 
-app.patch("/categories/:id", [auth, verifyAccountOwner], async (req, res) => {
+app.patch("/categories/:id", [verifyAuth, verifyAccountOwner], async (req, res) => {
   const { name, group } = req.body;
   const categoryId = Number(req.params.id);
   try {
@@ -383,7 +329,7 @@ app.patch("/categories/:id", [auth, verifyAccountOwner], async (req, res) => {
   }
 });
 
-app.delete("/categories/:id", [auth, verifyAccountOwner], async (req, res) => {
+app.delete("/categories/:id", [verifyAuth, verifyAccountOwner], async (req, res) => {
   const categoryId = Number(req.params.id);
   try {
     const transactionsUsingCategory = await prisma.transaction.count({
@@ -403,6 +349,161 @@ app.delete("/categories/:id", [auth, verifyAccountOwner], async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+app.get("/goals", verifyAuth, async (req, res) => {
+  const goals = await prisma.goal.findMany({
+    where: { userId: req.user.userId },
+  });
+  res.json(goals);
+});
+
+app.post("/goals", verifyAuth, async (req, res) => {
+  const { name, targetAmount, dueDate } = req.body;
+  const goal = await prisma.goal.create({
+    data: { name, targetAmount, dueDate: newDate ? new Date(dueDate) : null, userId: req.user.userId },
+  });
+  res.status(201).json(goal);
+});
+
+app.patch("/goals/:id", verifyAuth, async (req, res) => {
+  const { name, targetAmount, currentAmount, dueDate } = req.body;
+  const goalId = Number(req.params.id);
+  const goal = await prisma.goal.findUnique({
+    where: { id: goalId },
+  });
+
+  if (!goal || goal.userId !== req.user.userId) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  const updateGoal = await prisma.goal.update({
+    where: { id: goalId },
+    data: {
+      name,
+      targetAmount,
+      currentAmount,
+      dueDate: dueDate ? new Date(dueDate) : null,
+    },
+  });
+  res.json(updateGoal);
+});
+
+app.delete("/goals/:id", verifyAuth, async (req, res) => {
+  const goalId = Number(req.params.id);
+  const goal = await prisma.goal.findUnique({
+    where: { id: goalId },
+  });
+
+  if (!goal || goal.userId !== req.user.userId) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  await prisma.goal.delete({
+    where: { id: goalId },
+  });
+  res.json({ message: "Goal deleted" });
+});
+
+app.get("/reports/spending", verifyAuth, async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      userId: req.user.userId,
+      date: {
+        start: new Date(startDate),
+        end: new Date(endDate),
+      },
+      amount: {
+        lessthan: 0,
+      },
+    },
+    include: { category: true },
+  });
+  const byCategory = transactions.reduce((acc, transaction) => {
+    const category = transaction.category.name || "Uncategorized";
+    if (!acc[category]) acc[category] = 0;
+    acc[category] += transaction.amount;
+    return acc;
+  }, {});
+  res.json({
+    byCategory,
+    totalSpent: transactions.reduce((acc, transaction) => acc + transaction.amount, 0),
+    transactions,
+  });
+});
+
+app.get("/reports/net-worth", verifyAuth, async (req, res) => {
+  const accounts = await prisma.account.findMany({
+    where: { userId: req.user.userId },
+  });
+  const netWorth = accounts.reduce((acc, account) => acc + account.balance, 0);
+  res.json({
+    netWorth,
+    accounts: accounts.map((a) => ({ id: a.id, name: a.name, balance: a.balance })),
+  });
+});
+
+app.get("/report/trends", verifyAuth, async (req, res) => {
+  const { months = 6 } = req.query;
+  const startDate = new Date();
+  const endDate = new Date();
+  startDate.setMonth(startDate.getMonth() - months);
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      userId: req.user.userId,
+      date: {
+        start: startDate,
+        end: endDate,
+      },
+    },
+  });
+
+  const byMonth = transactions.reduce((acc, transaction) => {
+    const month = transaction.date.toISOString().slice(0, 7);
+    if (!acc[month]) acc[month] = { income: 0, expenses: 0 };
+    if (transaction.amount > 0) {
+      acc[month].income += transaction.amount;
+    } else {
+      acc[month].expenses += transaction.amount;
+    }
+    return acc;
+  }, {});
+  res.json(byMonth);
+});
+
+app.get("/user/profile", verifyAuth, async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { email: true, createdAt: true, preferences: true },
+  });
+  res.json(user);
+});
+
+app.patch("/user/password", verifyAuth, async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+  });
+
+  const passwordMatches = await bcrypt.compare(oldPassword, user.password);
+  if (!passwordMatches) {
+    return res.status(401).json({ error: "Invalid old password" });
+  }
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({
+    where: { id: req.user.userId },
+    data: { password: hashedPassword },
+  });
+  res.json({ message: "Password updated" });
+});
+
+app.patch("/user/preferences", verifyAuth, async (req, res) => {
+  const { currency, dateFormat } = req.body;
+  const user = await prisma.user.update({
+    where: { id: req.user.userId },
+    data: { preferences: { currency, dateFormat } },
+  });
+  res.json({ message: "Preferences updated" });
+});
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -410,7 +511,7 @@ app.use((err, req, res, next) => {
 });
 
 if (process.env.NODE_ENV !== "test") {
-  app.listen(process.env.PORT, () => {
+  app.listen(process.env.PORT, "0.0.0.0", () => {
     console.log(`Server is running on port ${process.env.PORT}`);
   });
 }
