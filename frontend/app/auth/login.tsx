@@ -1,5 +1,16 @@
 import React, { useState } from "react";
-import { TextInput, TouchableOpacity, Alert, ActivityIndicator, View, Text, StyleSheet } from "react-native";
+import {
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  StyleSheet,
+  Keyboard,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
+  View,
+} from "react-native";
 import { Link } from "expo-router";
 import { login } from "@/utils/api";
 import { useAuth } from "@/context/AuthContext";
@@ -17,6 +28,7 @@ export default function LoginScreen() {
   const tintColor = useThemeColor({}, "tint");
 
   const handleLogin = async () => {
+    Keyboard.dismiss();
     if (!email || !password) {
       Alert.alert("Error", "Please enter both email and password");
       return;
@@ -33,40 +45,48 @@ export default function LoginScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title" style={styles.title}>
-        Login
-      </ThemedText>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ThemedView style={styles.container}>
+          <ThemedText type="title" style={styles.title}>
+            Login
+          </ThemedText>
 
-      <TextInput
-        style={[styles.input, { color: textColor, borderColor: textColor }]}
-        placeholder="Email"
-        placeholderTextColor="#888"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
+          <TextInput
+            style={[styles.input, { color: textColor, borderColor: textColor }]}
+            placeholder="Email"
+            placeholderTextColor="#888"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
 
-      <TextInput
-        style={[styles.input, { color: textColor, borderColor: textColor }]}
-        placeholder="Password"
-        placeholderTextColor="#888"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
+          <TextInput
+            style={[styles.input, { color: textColor, borderColor: textColor }]}
+            placeholder="Password"
+            placeholderTextColor="#888"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
 
-      <TouchableOpacity style={[styles.button, { backgroundColor: tintColor }]} onPress={handleLogin} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.buttonText}>Login</ThemedText>}
-      </TouchableOpacity>
-      <ThemedView style={styles.footer}>
-        <ThemedText>Don&apos;t have an account? </ThemedText>
-        <Link href="/auth/signup">
-          <ThemedText style={{ color: tintColor }}>Sign up</ThemedText>
-        </Link>
-      </ThemedView>
-    </ThemedView>
+          <TouchableOpacity style={[styles.button, { backgroundColor: tintColor }]} onPress={handleLogin} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.buttonText}>Login</ThemedText>}
+          </TouchableOpacity>
+          <ThemedView style={styles.footer}>
+            <ThemedText>Don&apos;t have an account? </ThemedText>
+            <Link href="/auth/signup">
+              <ThemedText style={{ color: tintColor }}>Sign up</ThemedText>
+            </Link>
+          </ThemedView>
+        </ThemedView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 

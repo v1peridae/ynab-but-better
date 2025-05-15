@@ -159,6 +159,127 @@ app.delete("/accounts/:id", [verifyAuth, verifyAccountOwner], async (req, res) =
   res.json({ message: "Account Deleted" });
 });
 
+app.get("/user/dashboard", verifyAuth, async (req, res) => {
+  try {
+    const accounts = await prisma.account.findMany({
+      where: { userId: req.user.userId },
+    });
+    const totalBalance = accounts.reduce((acc, account) => acc + account.balance, 0);
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    let unassigned = 0;
+
+    const year = parseInt(currentMonth.substring(0, 4));
+    const month = parseInt(currentMonth.substring(5, 7)) - 1;
+    const firstDayCurrentMonth = new Date(Date.UTC(year, month, 1));
+    const firstDayNextMonth = new Date(Date.UTC(year, month + 1, 1));
+    const incomeTransactions = await prisma.transaction.findMany({
+      where: {
+        userId: req.user.userId,
+        date: {
+          gte: firstDayCurrentMonth,
+          lt: firstDayNextMonth,
+        },
+        amount: { gt: 0 },
+      },
+    });
+    const totalIncomeThisMonth = incomeTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+    let totalBudgetedThisMonth = 0;
+    const budgetMonth = await prisma.budgetMonth.findFirst({
+      where: {
+        month: currentMonth,
+        userId: req.user.userId,
+      },
+      include: {
+        items: {
+          select: { amount: true },
+        },
+      },
+    });
+
+    if (budgetMonth && budgetMonth.items) {
+      totalBudgetedThisMonth = budgetMonth.items.reduce((sum, item) => sum + item.amount, 0);
+    }
+    unassigned = totalIncomeThisMonth - totalBudgetedThisMonth;
+
+    const recentTransactions = await prisma.transaction.findMany({
+      where: { userId: req.user.userId },
+      orderBy: { date: "desc" },
+      take: 7,
+      include: { account: true, category: true },
+    });
+
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const thisWeeksTransactions = await prisma.transaction.findMany({
+      where: {
+        userId: req.user.userId,
+        date: { gte: oneWeekAgo },
+      },
+      include: { category: true },
+    });
+
+    const topPurchase =
+      thisWeeksTransactions.length > 0
+        ? thisWeeksTransactions.reduce((prev, current) => (prev.amount < current.amount ? current : prev))
+        : null;
+
+    const categorySpending = {};
+    thisWeeksTransactions.forEach((transaction) => {
+      if (transaction.categoryId && transaction.category) {
+        const categoryName = transaction.category.name;
+        if (!categorySpending[categoryName]) {
+          categorySpending[categoryName] = 0;
+        }
+        categorySpending[categoryName] += transaction.amount;
+      }
+    });
+
+    let topCategory = null;
+    let maxSpending = 0;
+
+    for (const [category, amount] of Object.entries(categorySpending)) {
+      if (amount > maxSpending) {
+        maxSpending = amount;
+        topCategory = category;
+      }
+    }
+
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+
+    const lastWeekTransactions = await prisma.transaction.findMany({
+      where: {
+        userId: req.user.userId,
+        date: { gte: twoWeeksAgo, lt: oneWeekAgo },
+      },
+    });
+
+    const thisWeeksTotal = thisWeeksTransactions.reduce((acc, transaction) => acc + transaction.amount, 0);
+    const lastWeekTotal = lastWeekTransactions.reduce((acc, transaction) => acc + transaction.amount, 0);
+
+    let weeklyPercentChange = 0;
+    if (lastWeekTotal > 0) {
+      weeklyPercentChange = Math.round(((thisWeeksTotal - lastWeekTotal) / lastWeekTotal) * 100);
+    }
+
+    res.json({
+      accounts,
+      totalBalance,
+      unassigned,
+      recentTransactions,
+      summary: {
+        topPurchase: topPurchase ? topPurchase.description : "Unknown",
+        topCategory: topCategory || "Unknown",
+        weeklyChangePercent: weeklyPercentChange,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 app.get("/transactions", verifyAuth, async (req, res) => {
   const transactions = await prisma.transaction.findMany({
     where: { userId: req.user.userId },
@@ -409,17 +530,17 @@ app.get("/reports/spending", verifyAuth, async (req, res) => {
     where: {
       userId: req.user.userId,
       date: {
-        start: new Date(startDate),
-        end: new Date(endDate),
+        gte: new Date(startDate),
+        lte: new Date(endDate),
       },
       amount: {
-        lessthan: 0,
+        lt: 0,
       },
     },
     include: { category: true },
   });
   const byCategory = transactions.reduce((acc, transaction) => {
-    const category = transaction.category.name || "Uncategorized";
+    const category = transaction.category?.name || "Uncategorized";
     if (!acc[category]) acc[category] = 0;
     acc[category] += transaction.amount;
     return acc;
@@ -451,8 +572,8 @@ app.get("/report/trends", verifyAuth, async (req, res) => {
     where: {
       userId: req.user.userId,
       date: {
-        start: startDate,
-        end: endDate,
+        gte: startDate,
+        lte: endDate,
       },
     },
   });

@@ -1,5 +1,15 @@
 import React, { useState } from "react";
-import { StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import {
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { Link, router } from "expo-router";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -58,63 +68,71 @@ export default function SignUpScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title" style={styles.title}>
-        Create an account
-      </ThemedText>
-      <TextInput
-        style={[styles.input, { color: textColor, borderColor: textColor }]}
-        placeholder="Email"
-        placeholderTextColor="#888"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        autoComplete="email"
-        editable={!loading}
-      />
+    <KeyboardAvoidingView
+      style={{ flex: 1, justifyContent: "center" }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? -40 : 0}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ThemedView style={styles.container}>
+          <ThemedText type="title" style={styles.title}>
+            Create an account
+          </ThemedText>
+          <TextInput
+            style={[styles.input, { color: textColor, borderColor: textColor }]}
+            placeholder="Email"
+            placeholderTextColor="#888"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoComplete="email"
+            editable={!loading}
+          />
 
-      <TextInput
-        style={[styles.input, { color: textColor, borderColor: textColor }]}
-        placeholder="Password"
-        placeholderTextColor="#888"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        editable={!loading}
-      />
+          <TextInput
+            style={[styles.input, { color: textColor, borderColor: textColor }]}
+            placeholder="Password"
+            placeholderTextColor="#888"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            editable={!loading}
+          />
 
-      <TextInput
-        style={[styles.input, { color: textColor, borderColor: textColor }]}
-        placeholder="Confirm Password"
-        placeholderTextColor="#888"
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-        secureTextEntry
-        editable={!loading}
-      />
+          <TextInput
+            style={[styles.input, { color: textColor, borderColor: textColor }]}
+            placeholder="Confirm Password"
+            placeholderTextColor="#888"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            editable={!loading}
+          />
 
-      <TouchableOpacity
-        style={[
-          styles.button,
-          {
-            backgroundColor: loading ? "#ccc" : tintColor,
-            opacity: loading ? 0.7 : 1,
-          },
-        ]}
-        onPress={handleSignUp}
-        disabled={loading}
-      >
-        {loading ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.buttonText}>Sign Up</ThemedText>}
-      </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              {
+                backgroundColor: loading ? "#ccc" : tintColor,
+                opacity: loading ? 0.7 : 1,
+              },
+            ]}
+            onPress={handleSignUp}
+            disabled={loading}
+          >
+            {loading ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.buttonText}>Sign Up</ThemedText>}
+          </TouchableOpacity>
 
-      <ThemedView style={styles.footer}>
-        <ThemedText>Already have an account? </ThemedText>
-        <Link href="/auth/login" disabled={loading}>
-          <ThemedText style={{ color: tintColor }}>Login</ThemedText>
-        </Link>
-      </ThemedView>
-    </ThemedView>
+          <ThemedView style={styles.footer}>
+            <ThemedText>Already have an account? </ThemedText>
+            <Link href="/auth/login" disabled={loading}>
+              <ThemedText style={{ color: tintColor }}>Login</ThemedText>
+            </Link>
+          </ThemedView>
+        </ThemedView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
