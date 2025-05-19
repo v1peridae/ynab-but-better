@@ -16,12 +16,14 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { signup } from "@/utils/api";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useAuth } from "@/context/AuthContext";
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
+  const { login: authLogin } = useAuth();
 
   const textColor = useThemeColor({}, "text");
   const backgroundColor = useThemeColor({}, "background");
@@ -47,20 +49,14 @@ export default function SignUpScreen() {
 
     setLoading(true);
     try {
-      console.log("Starting signup process...");
       const response = await signup({ email, password });
-      console.log("Signup successful, redirecting to login...");
-      Alert.alert("Success", "Account created successfully!", [
-        {
-          text: "OK",
-          onPress: () => {
-            console.log("Navigating to login screen...");
-            router.replace("/auth/login");
-          },
-        },
-      ]);
+
+      if (response.token && response.refreshToken) {
+        await authLogin(response.token, response.refreshToken);
+      }
+
+      router.replace("/onboarding");
     } catch (error) {
-      console.error("Signup error in screen:", error);
       Alert.alert("Error", error instanceof Error ? error.message : "An unexpected error occurred during signup");
     } finally {
       setLoading(false);

@@ -42,7 +42,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="add-transaction"
+        name="add-transactions"
         options={{
           title: "",
           tabBarIcon: () => (
@@ -67,12 +67,6 @@ export default function TabLayout() {
         options={{
           title: "Transactions",
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="creditcard.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="add-transactions"
-        options={{
-          title: "Add Transaction",
         }}
       />
     </Tabs>

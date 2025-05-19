@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, Alert } from "react-native";
+import { View, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, Alert, ActivityIndicator } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useAuth } from "@/context/AuthContext";
+import { API_URL } from "@/constants/apiurl";
 
 interface Transaction {
   id: string;
@@ -14,9 +16,9 @@ interface Transaction {
   };
 }
 
-const getTransactions = async (token: string) => {
+const getTransactions = async (token: string): Promise<any[]> => {
   try {
-    const response = await fetch("http://192.168.100.3:3000/transactions", {
+    const response = await fetch(`${API_URL}/transactions`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -38,7 +40,6 @@ export default function TransactionsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [account, setAccount] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [accounts, setAccounts] = useState([]);
   const textColor = useThemeColor({}, "text");
@@ -60,7 +61,7 @@ export default function TransactionsScreen() {
     const fetchAccounts = async () => {
       if (token) {
         try {
-          const response = await fetch("http://192.168.100.3:3000/accounts", {
+          const response = await fetch(`${API_URL}/accounts`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -91,7 +92,7 @@ export default function TransactionsScreen() {
       return;
     }
     try {
-      const response = await fetch("http://192.168.100.3:3000/transactions", {
+      const response = await fetch(`${API_URL}/transactions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -139,11 +140,12 @@ export default function TransactionsScreen() {
         renderItem={renderTransaction}
         keyExtractor={(item) => item.id}
         style={styles.list}
-        ListHeaderComponent={
+        ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
             <ThemedText style={styles.emptyText}>No transactions yet</ThemedText>
           </View>
-        }
+        )}
+        ListFooterComponent={loading ? <ActivityIndicator style={{ marginTop: 20 }} /> : null}
       />
 
       <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
@@ -169,17 +171,16 @@ export default function TransactionsScreen() {
               onChangeText={setAmount}
               keyboardType="decimal-pad"
             />
-            <TextInput
+            <Picker
+              selectedValue={selectedAccountId}
+              onValueChange={(itemValue) => setSelectedAccountId(itemValue)}
               style={[styles.input, { color: textColor, borderColor: textColor }]}
-              placeholder="Account ID (number)"
-              placeholderTextColor="#888"
-              value={account}
-              onChangeText={(text) => {
-                setAccount(text);
-                setSelectedAccountId(text ? parseInt(text, 10) : null);
-              }}
-              keyboardType="number-pad"
-            />
+            >
+              <Picker.Item label="Select Account" value={null} />
+              {accounts.map((acc: any) => (
+                <Picker.Item key={acc.id} label={acc.name} value={acc.id} />
+              ))}
+            </Picker>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisible(false)}>

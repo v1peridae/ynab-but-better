@@ -330,6 +330,49 @@ app.get("/budget/:month", verifyAuth, async (req, res) => {
   res.json(items);
 });
 
+app.post("/user/onboarding", verifyAuth, async (req, res) => {
+  const { name, account, categories } = req.body;
+  try {
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: {
+        name,
+      },
+    });
+
+    if (accounts && accounts.length > 0) {
+      for (const account of accounts) {
+        await prisma.account.create({
+          data: { name: account.name, balance: account.balance, userId: req.user.userId },
+        });
+      }
+    }
+
+    if (categories && categories.length > 0) {
+      for (const category of categories) {
+        await prisma.category.create({
+          data: { name: category.name, group: category.group || "Other", userId: req.user.userId },
+        });
+      }
+    }
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const existingBudgetMonth = await prisma.budgetMonth.findFirst({
+      where: { month: currentMonth, userId: req.user.userId },
+    });
+
+    if (!existingBudgetMonth) {
+      await prisma.budgetMonth.create({
+        data: { month: currentMonth, userId: req.user.userId },
+      });
+    }
+    res.status(200).json({ message: "Onboarding completed successfully" });
+  } catch (error) {
+    console.error("Error during onboarding:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
   const { amount } = req.body;
   const month = req.params.month;

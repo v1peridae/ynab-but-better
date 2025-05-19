@@ -17,7 +17,15 @@ interface AuthResponse {
   refreshToken: string;
 }
 
-export const signup = async (data: SignupData): Promise<{ message: string; userId: number }> => {
+interface SignupResponse {
+  message: string;
+  userId: number;
+  token: string;
+  refreshToken: string;
+  expiresAt: string;
+}
+
+export const signup = async (data: SignupData): Promise<SignupResponse> => {
     try {
         console.log('Starting signup request...');
         console.log('API URL:', `${API_URL}/auth/signup`);
@@ -70,6 +78,28 @@ export const signup = async (data: SignupData): Promise<{ message: string; userI
     }
 };
 
+export const saveOnboardingData = async (data: any, token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/onboarding`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to save onboarding data");
+    }
+    return response.json();
+  } catch (error) {
+    console.error('Error saving onboarding data:', error);
+    throw error;
+  }
+};
+
 export const login = async (data: LoginData): Promise <AuthResponse> => {
     try {
         const response = await fetch(`${API_URL}/auth/login`, {
@@ -93,4 +123,26 @@ export const login = async (data: LoginData): Promise <AuthResponse> => {
         }
         throw error;
     }
+};
+
+export const saveOnboardingPreferences = async (data: any, token: string) => {
+  try {
+    const response = await fetch(`${API_URL}/user/onboarding`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to save preferences");
+    }
+    return response.json();
+  } catch (error) {
+    console.error('Error saving onboarding preferences:', error);
+    throw error;
+  }
 };

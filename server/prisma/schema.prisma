@@ -11,6 +11,7 @@ model User {
   id                    Int                     @id @default(autoincrement())
   email                 String                  @unique
   password              String
+  name                  String?
   accounts              Account[]
   transactions          Transaction[]
   categories            Category[]

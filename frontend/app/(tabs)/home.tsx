@@ -5,10 +5,11 @@ import { ThemedText } from "@/components/ThemedText";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useAuth } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
+import { API_URL } from "@/constants/apiurl";
 
-const fetchDashboardData = async (token) => {
+const fetchDashboardData = async (token: string): Promise<any> => {
   try {
-    const response = await fetch("http://192.168.100.3:3000/user/dashboard", {
+    const response = await fetch(`${API_URL}/user/dashboard`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -89,7 +90,7 @@ export default function HomeScreen() {
     fetchData();
   }, [token]);
 
-  const renderTransactionItem = ({ item }) => (
+  const renderTransactionItem = ({ item }: { item: any }) => (
     <View style={styles.transactionItem}>
       <View>
         <ThemedText>{item.description || "something"}</ThemedText>
