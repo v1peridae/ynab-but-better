@@ -4,7 +4,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useAuth } from "@/context/AuthContext";
-import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL } from "@/constants/apiurl";
@@ -19,10 +19,11 @@ interface Category {
   name: string;
 }
 
-const AddTransactionsScreen: React.FC = () => {
+const AddTransactionsScreen = () => {
   const { token, logout } = useAuth();
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
+  const [payee, setPayee] = useState("");
   const [isInflow, setIsInflow] = useState(true);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [selectedPayeeId, setSelectedPayeeId] = useState<string | null>(null);
@@ -35,28 +36,29 @@ const AddTransactionsScreen: React.FC = () => {
   const [repeat, setRepeat] = useState("never");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
   const textColor = useThemeColor({}, "text");
   const tintColor = useThemeColor({}, "tint");
-  const backgroundColor = useThemeColor({}, "background");
 
+  // Load accounts and categories on mount
   useEffect(() => {
-    const init = async () => {
+    const fetchData = async () => {
       if (!token) {
-        setLoadingData(false);
+        setLoading(false);
         return;
       }
       try {
         await Promise.all([fetchAccounts(), fetchCategories()]);
       } catch (error) {
-        console.error("Error during initial data fetch:", error);
+        console.error("Error loading data:", error);
       } finally {
-        setLoadingData(false);
+        setLoading(false);
       }
     };
 
-    init();
+    fetchData();
   }, [token]);
 
   const fetchAccounts = async () => {
@@ -67,23 +69,28 @@ const AddTransactionsScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
+
       if (response.status === 401) {
-        Alert.alert("Session Expired", "Please login again");
+        Alert.alert("Session expired", "Please log in again");
         logout?.();
         return;
       }
+
       if (response.ok) {
         const data = await response.json();
+        console.log("Fetched accounts:", data);
         setAccounts(data);
         if (data.length > 0) {
           setSelectedAccountId(data[0].id);
         }
       } else {
-        Alert.alert("Error", "Failed to fetch accounts");
+        console.error("Failed to fetch accounts, status:", response.status);
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
       }
     } catch (error) {
       console.error("Error fetching accounts:", error);
-      Alert.alert("Error", "Failed to fetch accounts");
+      Alert.alert("Error", "Failed to fetch accounts. Please try again.");
     }
   };
 
@@ -91,64 +98,65 @@ const AddTransactionsScreen: React.FC = () => {
     try {
       const response = await fetch(`${API_URL}/categories`, {
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       });
+
       if (response.status === 401) {
-        Alert.alert("Session Expired", "Please login again");
+        Alert.alert("Session expired", "Please log in again");
         logout?.();
         return;
       }
+
       if (response.ok) {
         const data = await response.json();
         setCategories(data);
         if (data.length > 0) {
           setSelectedCategoryId(data[0].id);
         }
-      } else {
-        Alert.alert("Error", "Failed to fetch categories");
       }
     } catch (error) {
       console.error("Error fetching categories:", error);
-      Alert.alert("Error", "Failed to fetch categories");
     }
   };
 
-  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+  const handleDateChange = (event: any, selectedDate?: Date) => {
     const currentDate = selectedDate || date;
     setShowDatePicker(Platform.OS === "ios");
     setDate(currentDate);
   };
 
-  const handleAddTransaction = async () => {
-    if (!description || !amount || !selectedAccountId) {
-      Alert.alert("Error", "Please fill in description, amount, and select an account");
+  const saveTransaction = async () => {
+    if (!amount || !selectedAccountId) {
+      Alert.alert("Missing information", "Please enter an amount and select an account");
       return;
     }
 
     const amountInCents = Math.round(parseFloat(amount) * 100);
     if (isNaN(amountInCents)) {
-      Alert.alert("Error", "Invalid amount");
+      Alert.alert("Invalid amount", "Please enter a valid number");
       return;
     }
 
     const finalAmount = isInflow ? amountInCents : -amountInCents;
+    const txDescription = description || payee || "Unnamed transaction";
 
     setSubmitting(true);
+
     try {
       const transaction = {
-        description,
+        description: txDescription,
         amount: finalAmount,
-        accountId: selectedAccountId,
-        categoryId: selectedCategoryId,
-        payeeId: selectedPayeeId,
-        date: date.toISOString(),
-        cleared: isCleared,
+        accountId: selectedAccountId ? Number(selectedAccountId) : undefined,
+        categoryId: selectedCategoryId ? Number(selectedCategoryId) : undefined,
+        payeeId: selectedPayeeId ? Number(selectedPayeeId) : undefined,
         memo,
+        cleared: isCleared,
         flag,
         repeat,
+        date: date.toISOString(),
       };
+
       const response = await fetch(`${API_URL}/transactions`, {
         method: "POST",
         headers: {
@@ -159,7 +167,7 @@ const AddTransactionsScreen: React.FC = () => {
       });
 
       if (response.status === 401) {
-        Alert.alert("Session Expired", "Please login again");
+        Alert.alert("Session expired", "Please log in again");
         logout?.();
         return;
       }
@@ -169,11 +177,12 @@ const AddTransactionsScreen: React.FC = () => {
         Alert.alert("Error", errorData.message || "Failed to add transaction");
         return;
       }
+
       resetForm();
       Alert.alert("Success", "Transaction added successfully");
     } catch (error) {
       console.error("Error adding transaction:", error);
-      Alert.alert("Error", "Failed to add transaction");
+      Alert.alert("Error", "Failed to save transaction");
     } finally {
       setSubmitting(false);
     }
@@ -181,6 +190,7 @@ const AddTransactionsScreen: React.FC = () => {
 
   const resetForm = () => {
     setDescription("");
+    setPayee("");
     setAmount("");
     setIsInflow(true);
     setDate(new Date());
@@ -200,9 +210,14 @@ const AddTransactionsScreen: React.FC = () => {
     purple: "#9C27B0",
   };
 
-  if (loadingData) {
+  // Debug accounts
+  useEffect(() => {
+    console.log("Current accounts:", accounts);
+  }, [accounts]);
+
+  if (loading) {
     return (
-      <ThemedView style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+      <ThemedView style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={tintColor} />
       </ThemedView>
     );
@@ -210,66 +225,48 @@ const AddTransactionsScreen: React.FC = () => {
 
   return (
     <ThemedView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={true} contentContainerStyle={{ paddingBottom: 40 }}>
-        <ThemedText style={styles.title}>New Transaction</ThemedText>
-        <View style={styles.rowContainer}>
-          <ThemedText style={styles.label}>Transaction Type</ThemedText>
-          <View style={styles.flowTypeContainer}>
-            <TouchableOpacity
-              style={[styles.flowTypeButton, isInflow && { backgroundColor: tintColor, borderColor: tintColor }]}
-              onPress={() => setIsInflow(true)}
-            >
-              <ThemedText style={isInflow ? styles.selectedFlowText : {}}>Income (+)</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.flowTypeButton, !isInflow && { backgroundColor: tintColor, borderColor: tintColor }]}
-              onPress={() => setIsInflow(false)}
-            >
-              <ThemedText style={!isInflow ? styles.selectedFlowText : {}}>Expense (-)</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <ThemedText style={styles.label}>Description</ThemedText>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Payee */}
+        <ThemedText style={styles.label}>Payee</ThemedText>
         <TextInput
           style={[styles.input, { color: textColor, borderColor: textColor }]}
-          placeholder="What's this transaction for?"
+          placeholder="Payee (optional)"
           placeholderTextColor="#888"
-          value={description}
-          onChangeText={setDescription}
+          value={payee}
+          onChangeText={setPayee}
         />
 
-        <ThemedText style={styles.label}>Amount</ThemedText>
-        <TextInput
-          style={[styles.input, { color: textColor, borderColor: textColor }]}
-          placeholder="0.00"
-          placeholderTextColor="#888"
-          value={amount}
-          onChangeText={setAmount}
-          keyboardType="decimal-pad"
-        />
-
-        <ThemedText style={styles.formSectionTitle}>Account Details</ThemedText>
+        {/* From Account */}
         <ThemedText style={styles.label}>From Account</ThemedText>
         <View style={[styles.pickerContainer, { borderColor: textColor }]}>
-          <Picker
-            selectedValue={selectedAccountId}
-            onValueChange={(itemValue) => setSelectedAccountId(itemValue)}
-            style={[styles.picker, { color: textColor, height: 45 }]}
-            dropdownIconColor={textColor}
-          >
-            {accounts.map((account) => (
-              <Picker.Item key={account.id} label={account.name} value={account.id} />
-            ))}
-          </Picker>
+          {accounts.length === 0 ? (
+            <TouchableOpacity
+              style={[styles.input, { borderColor: textColor, alignItems: "center", justifyContent: "center" }]}
+              onPress={fetchAccounts}
+            >
+              <ThemedText>No accounts found. Tap to retry.</ThemedText>
+            </TouchableOpacity>
+          ) : (
+            <Picker
+              selectedValue={selectedAccountId}
+              onValueChange={(itemValue) => setSelectedAccountId(itemValue)}
+              style={[styles.picker, { color: textColor }]}
+              dropdownIconColor={textColor}
+            >
+              {accounts.map((account) => (
+                <Picker.Item key={account.id} label={account.name} value={account.id} />
+              ))}
+            </Picker>
+          )}
         </View>
 
-        <ThemedText style={styles.label}>Payee Account</ThemedText>
+        {/* Transfer Account */}
+        <ThemedText style={styles.label}>Transfer Account</ThemedText>
         <View style={[styles.pickerContainer, { borderColor: textColor }]}>
           <Picker
             selectedValue={selectedPayeeId}
             onValueChange={(itemValue) => setSelectedPayeeId(itemValue)}
-            style={[styles.picker, { color: textColor, height: 45 }]}
+            style={[styles.picker, { color: textColor }]}
             dropdownIconColor={textColor}
           >
             <Picker.Item label="Not a transfer" value={null} />
@@ -279,13 +276,18 @@ const AddTransactionsScreen: React.FC = () => {
           </Picker>
         </View>
 
-        <ThemedText style={styles.formSectionTitle}>Details</ThemedText>
+        {/* Details Section */}
+        <View style={styles.sectionHeader}>
+          <ThemedText style={styles.sectionTitle}>Details</ThemedText>
+        </View>
+
+        {/* Category */}
         <ThemedText style={styles.label}>Category</ThemedText>
         <View style={[styles.pickerContainer, { borderColor: textColor }]}>
           <Picker
             selectedValue={selectedCategoryId}
             onValueChange={(itemValue) => setSelectedCategoryId(itemValue)}
-            style={[styles.picker, { color: textColor, height: 45 }]}
+            style={[styles.picker, { color: textColor }]}
             dropdownIconColor={textColor}
           >
             <Picker.Item label="Select category" value={null} />
@@ -295,13 +297,29 @@ const AddTransactionsScreen: React.FC = () => {
           </Picker>
         </View>
 
+        {/* Date */}
         <ThemedText style={styles.label}>Date</ThemedText>
-        <TouchableOpacity style={[styles.dateButton, { borderColor: textColor, height: 45 }]} onPress={() => setShowDatePicker(true)}>
-          <ThemedText>{date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</ThemedText>
+        <TouchableOpacity
+          style={[styles.input, { borderColor: textColor, alignItems: "center", justifyContent: "center" }]}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <ThemedText>{date.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}</ThemedText>
         </TouchableOpacity>
         {showDatePicker && <DateTimePicker value={date} mode="date" display="default" onChange={handleDateChange} />}
 
-        <ThemedText style={styles.formSectionTitle}>Additional Info</ThemedText>
+        {/* Date chip */}
+        <View style={styles.dateChip}>
+          <ThemedText style={styles.dateChipText}>
+            {date.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+          </ThemedText>
+        </View>
+
+        {/* Additional Info Section */}
+        <View style={styles.sectionHeader}>
+          <ThemedText style={styles.sectionTitle}>Additional Info</ThemedText>
+        </View>
+
+        {/* Notes/Memo */}
         <ThemedText style={styles.label}>Notes / Memo</ThemedText>
         <TextInput
           style={[styles.input, { color: textColor, borderColor: textColor, height: 80, textAlignVertical: "top" }]}
@@ -313,7 +331,8 @@ const AddTransactionsScreen: React.FC = () => {
           numberOfLines={3}
         />
 
-        <View style={styles.switchContainer}>
+        {/* Cleared */}
+        <View style={styles.switchRow}>
           <ThemedText style={styles.label}>Cleared</ThemedText>
           <Switch
             value={isCleared}
@@ -323,8 +342,9 @@ const AddTransactionsScreen: React.FC = () => {
           />
         </View>
 
+        {/* Flags */}
         <ThemedText style={styles.label}>Flag Transaction</ThemedText>
-        <View style={styles.flagContainer}>
+        <View style={styles.flagsContainer}>
           {Object.entries(flagColors).map(([flagName, color]) => (
             <TouchableOpacity
               key={flagName}
@@ -342,12 +362,13 @@ const AddTransactionsScreen: React.FC = () => {
           ))}
         </View>
 
-        <ThemedText style={[styles.label, { marginTop: 20 }]}>Repeat</ThemedText>
-        <View style={styles.repeatPickerContainer}>
+        {/* Repeat */}
+        <ThemedText style={styles.label}>Repeat</ThemedText>
+        <View style={[styles.pickerContainer, { borderColor: textColor }]}>
           <Picker
             selectedValue={repeat}
-            onValueChange={(itemValue) => setRepeat(itemValue as string)}
-            style={[styles.repeatPicker, { height: 45 }]}
+            onValueChange={(itemValue) => setRepeat(itemValue)}
+            style={[styles.picker, { color: textColor }]}
             dropdownIconColor={textColor}
           >
             <Picker.Item label="Never" value="never" />
@@ -358,53 +379,96 @@ const AddTransactionsScreen: React.FC = () => {
           </Picker>
         </View>
 
+        {/* Save Button */}
         <TouchableOpacity
-          style={[
-            styles.button,
-            {
-              backgroundColor: submitting ? "#ccc" : tintColor,
-              opacity: submitting ? 0.7 : 1,
-              height: 50,
-              marginTop: 20,
-              marginBottom: 30,
-            },
-          ]}
-          onPress={handleAddTransaction}
+          style={[styles.button, { backgroundColor: submitting ? "#ccc" : "#0a7ea4", opacity: submitting ? 0.7 : 1 }]}
+          onPress={saveTransaction}
           disabled={submitting}
         >
-          {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.buttonText}>Save Transaction</ThemedText>}
+          {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.buttonText}>Save</ThemedText>}
         </TouchableOpacity>
+
+        {/* Hidden fields */}
+        <TextInput style={{ display: "none" }} value={description} onChangeText={setDescription} defaultValue={payee} />
+
+        <TextInput style={{ display: "none" }} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" defaultValue="0" />
       </ScrollView>
     </ThemedView>
   );
 };
 
-export default AddTransactionsScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    paddingBottom: 40,
   },
-  title: { fontSize: 26, fontWeight: "bold", marginBottom: 25, marginTop: 30 },
-  label: { fontSize: 15, marginBottom: 6, fontWeight: "500" },
-  input: { marginBottom: 15, padding: 10, borderWidth: 1, borderColor: "#ccc", borderRadius: 5, height: 45 },
-  button: { padding: 15, borderRadius: 5, height: 50, marginTop: 20, marginBottom: 30, alignItems: "center", justifyContent: "center" },
-  buttonText: { color: "white", fontSize: 16, fontWeight: "bold", textAlign: "center" },
-  rowContainer: { flexDirection: "column", marginBottom: 10 },
-  pickerContainer: { borderWidth: 1, borderRadius: 5, marginBottom: 15 },
-  picker: { height: 45, paddingHorizontal: 10 },
-  dateButton: {
-    padding: 10,
-    borderRadius: 5,
-    borderWidth: 1,
-    marginBottom: 15,
-    alignItems: "center",
+  centered: {
     justifyContent: "center",
+    alignItems: "center",
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  label: {
+    fontSize: 15,
+    marginBottom: 6,
+    fontWeight: "500",
+  },
+  input: {
+    marginBottom: 15,
+    padding: 10,
+    borderWidth: 1,
+    borderRadius: 5,
     height: 45,
   },
-  switchContainer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginVertical: 15 },
-  flagContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", marginBottom: 20 },
+  pickerContainer: {
+    borderWidth: 1,
+    borderRadius: 5,
+    marginBottom: 15,
+    backgroundColor: "transparent",
+    overflow: "hidden",
+  },
+  picker: {
+    height: 45,
+    backgroundColor: "transparent",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#444",
+    paddingBottom: 8,
+    marginTop: 20,
+    marginBottom: 15,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  dateChip: {
+    backgroundColor: "#333",
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignSelf: "flex-start",
+    marginVertical: 10,
+  },
+  dateChipText: {
+    color: "white",
+    fontSize: 14,
+  },
+  switchRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginVertical: 15,
+  },
+  flagsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 20,
+  },
   flagButton: {
     width: 40,
     height: 40,
@@ -413,41 +477,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "transparent",
   },
-  selectedFlag: { borderWidth: 2, borderColor: "#000" },
-  flowTypeContainer: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
-  flowTypeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 5,
+  selectedFlag: {
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  button: {
+    padding: 15,
     borderRadius: 5,
-    borderWidth: 1,
-    marginHorizontal: 3,
+    marginTop: 20,
+    marginBottom: 30,
     alignItems: "center",
-  },
-  selectedFlowText: { color: "white", fontWeight: "600" },
-  repeatPickerContainer: {
-    borderWidth: 1,
-    borderRadius: 5,
-    borderColor: "#ccc",
-    marginBottom: 20,
-    backgroundColor: "#f7f7f7",
-    paddingHorizontal: 5,
-    minHeight: 50,
     justifyContent: "center",
   },
-  repeatPicker: {
-    width: "100%",
-    color: "#333",
-  },
-  formSectionTitle: {
-    fontSize: 18,
+  buttonText: {
+    color: "white",
+    fontSize: 16,
     fontWeight: "bold",
-    marginTop: 25,
-    marginBottom: 12,
-    paddingBottom: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: "#333333",
   },
 });
+
+export default AddTransactionsScreen;
