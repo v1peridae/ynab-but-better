@@ -60,7 +60,26 @@ router.post("/signup", [body("email").isEmail().withMessage("Invalid email"), bo
       },
     });
 
-    res.status(201).json({ message: "Account created successfully", userId: user.id });
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const refreshToken = uuidv4();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    await prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        expiresAt: expiresAt,
+        userId: user.id,
+      },
+    });
+
+    res.status(201).json({
+      message: "Account created successfully",
+      userId: user.id,
+      token,
+      refreshToken,
+      expiresAt,
+    });
   } catch (error) {
     console.error("Error signing up", error);
     res.status(500).json({ error: "Internal server error" });

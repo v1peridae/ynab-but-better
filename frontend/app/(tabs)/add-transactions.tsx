@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TextInput, TouchableOpacity, Alert, Switch, ScrollView, Platform } from "react-native";
+import { View, StyleSheet, TextInput, TouchableOpacity, Alert, Switch, ScrollView, Platform, ActivityIndicator } from "react-native";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useThemeColor } from "@/hooks/useThemeColor";
@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
+import { API_URL } from "@/constants/apiurl";
 
 interface Account {
   id: string;
@@ -34,20 +35,33 @@ const AddTransactionsScreen: React.FC = () => {
   const [repeat, setRepeat] = useState("never");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const textColor = useThemeColor({}, "text");
   const tintColor = useThemeColor({}, "tint");
   const backgroundColor = useThemeColor({}, "background");
 
   useEffect(() => {
-    if (token) {
-      fetchAccounts();
-      fetchCategories();
-    }
+    const init = async () => {
+      if (!token) {
+        setLoadingData(false);
+        return;
+      }
+      try {
+        await Promise.all([fetchAccounts(), fetchCategories()]);
+      } catch (error) {
+        console.error("Error during initial data fetch:", error);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    init();
   }, [token]);
 
   const fetchAccounts = async () => {
     try {
-      const response = await fetch("http://192.168.100.3:3000/accounts", {
+      const response = await fetch(`${API_URL}/accounts`, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -75,7 +89,7 @@ const AddTransactionsScreen: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("http://192.168.100.3:3000/categories", {
+      const response = await fetch(`${API_URL}/categories`, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -121,6 +135,7 @@ const AddTransactionsScreen: React.FC = () => {
 
     const finalAmount = isInflow ? amountInCents : -amountInCents;
 
+    setSubmitting(true);
     try {
       const transaction = {
         description,
@@ -134,7 +149,7 @@ const AddTransactionsScreen: React.FC = () => {
         flag,
         repeat,
       };
-      const response = await fetch("http://192.168.100.3:3000/transactions", {
+      const response = await fetch(`${API_URL}/transactions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -159,6 +174,8 @@ const AddTransactionsScreen: React.FC = () => {
     } catch (error) {
       console.error("Error adding transaction:", error);
       Alert.alert("Error", "Failed to add transaction");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -183,29 +200,40 @@ const AddTransactionsScreen: React.FC = () => {
     purple: "#9C27B0",
   };
 
+  if (loadingData) {
+    return (
+      <ThemedView style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={tintColor} />
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={true} contentContainerStyle={{ paddingBottom: 40 }}>
-        <ThemedText style={styles.title}>Add Transaction</ThemedText>
+        <ThemedText style={styles.title}>New Transaction</ThemedText>
         <View style={styles.rowContainer}>
           <ThemedText style={styles.label}>Transaction Type</ThemedText>
           <View style={styles.flowTypeContainer}>
-            <TouchableOpacity style={[styles.flowTypeButton, isInflow && { borderColor: tintColor }]} onPress={() => setIsInflow(true)}>
-              <ThemedText style={isInflow ? styles.selectedFlowText : {}}>Inflow (+)</ThemedText>
+            <TouchableOpacity
+              style={[styles.flowTypeButton, isInflow && { backgroundColor: tintColor, borderColor: tintColor }]}
+              onPress={() => setIsInflow(true)}
+            >
+              <ThemedText style={isInflow ? styles.selectedFlowText : {}}>Income (+)</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.flowTypeButton, !isInflow && styles.selectedFlowType, { borderColor: textColor }]}
+              style={[styles.flowTypeButton, !isInflow && { backgroundColor: tintColor, borderColor: tintColor }]}
               onPress={() => setIsInflow(false)}
             >
-              <ThemedText style={!isInflow ? styles.selectedFlowText : {}}>Outflow (-)</ThemedText>
+              <ThemedText style={!isInflow ? styles.selectedFlowText : {}}>Expense (-)</ThemedText>
             </TouchableOpacity>
           </View>
         </View>
 
-        <ThemedText style={styles.label}>Payee</ThemedText>
+        <ThemedText style={styles.label}>Description</ThemedText>
         <TextInput
           style={[styles.input, { color: textColor, borderColor: textColor }]}
-          placeholder="Description"
+          placeholder="What's this transaction for?"
           placeholderTextColor="#888"
           value={description}
           onChangeText={setDescription}
@@ -214,19 +242,20 @@ const AddTransactionsScreen: React.FC = () => {
         <ThemedText style={styles.label}>Amount</ThemedText>
         <TextInput
           style={[styles.input, { color: textColor, borderColor: textColor }]}
-          placeholder="Amount"
+          placeholder="0.00"
           placeholderTextColor="#888"
           value={amount}
           onChangeText={setAmount}
           keyboardType="decimal-pad"
         />
 
-        <ThemedText style={styles.label}>Account</ThemedText>
+        <ThemedText style={styles.formSectionTitle}>Account Details</ThemedText>
+        <ThemedText style={styles.label}>From Account</ThemedText>
         <View style={[styles.pickerContainer, { borderColor: textColor }]}>
           <Picker
             selectedValue={selectedAccountId}
             onValueChange={(itemValue) => setSelectedAccountId(itemValue)}
-            style={[styles.picker, { color: textColor }]}
+            style={[styles.picker, { color: textColor, height: 45 }]}
             dropdownIconColor={textColor}
           >
             {accounts.map((account) => (
@@ -240,25 +269,26 @@ const AddTransactionsScreen: React.FC = () => {
           <Picker
             selectedValue={selectedPayeeId}
             onValueChange={(itemValue) => setSelectedPayeeId(itemValue)}
-            style={[styles.picker, { color: textColor }]}
+            style={[styles.picker, { color: textColor, height: 45 }]}
             dropdownIconColor={textColor}
           >
-            <Picker.Item label="None (not a transfer)" value={null} />
+            <Picker.Item label="Not a transfer" value={null} />
             {accounts.map((account) => (
               <Picker.Item key={account.id} label={account.name} value={account.id} />
             ))}
           </Picker>
         </View>
 
+        <ThemedText style={styles.formSectionTitle}>Details</ThemedText>
         <ThemedText style={styles.label}>Category</ThemedText>
         <View style={[styles.pickerContainer, { borderColor: textColor }]}>
           <Picker
             selectedValue={selectedCategoryId}
             onValueChange={(itemValue) => setSelectedCategoryId(itemValue)}
-            style={[styles.picker, { color: textColor }]}
+            style={[styles.picker, { color: textColor, height: 45 }]}
             dropdownIconColor={textColor}
           >
-            <Picker.Item label="None" value={null} />
+            <Picker.Item label="Select category" value={null} />
             {categories.map((category) => (
               <Picker.Item key={category.id} label={category.name} value={category.id} />
             ))}
@@ -266,10 +296,22 @@ const AddTransactionsScreen: React.FC = () => {
         </View>
 
         <ThemedText style={styles.label}>Date</ThemedText>
-        <TouchableOpacity style={[styles.dateButton, { borderColor: textColor }]} onPress={() => setShowDatePicker(true)}>
-          <ThemedText>{date.toLocaleDateString()}</ThemedText>
+        <TouchableOpacity style={[styles.dateButton, { borderColor: textColor, height: 45 }]} onPress={() => setShowDatePicker(true)}>
+          <ThemedText>{date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</ThemedText>
         </TouchableOpacity>
         {showDatePicker && <DateTimePicker value={date} mode="date" display="default" onChange={handleDateChange} />}
+
+        <ThemedText style={styles.formSectionTitle}>Additional Info</ThemedText>
+        <ThemedText style={styles.label}>Notes / Memo</ThemedText>
+        <TextInput
+          style={[styles.input, { color: textColor, borderColor: textColor, height: 80, textAlignVertical: "top" }]}
+          placeholder="Add notes about this transaction (optional)"
+          placeholderTextColor="#888"
+          value={memo}
+          onChangeText={setMemo}
+          multiline={true}
+          numberOfLines={3}
+        />
 
         <View style={styles.switchContainer}>
           <ThemedText style={styles.label}>Cleared</ThemedText>
@@ -281,24 +323,21 @@ const AddTransactionsScreen: React.FC = () => {
           />
         </View>
 
-        <ThemedText style={styles.label}>Memo</ThemedText>
-        <TextInput
-          style={[styles.input, { color: textColor, borderColor: textColor }]}
-          placeholder="Memo (optional)"
-          placeholderTextColor="#888"
-          value={memo}
-          onChangeText={setMemo}
-        />
-
-        <ThemedText style={styles.label}>Flag</ThemedText>
+        <ThemedText style={styles.label}>Flag Transaction</ThemedText>
         <View style={styles.flagContainer}>
           {Object.entries(flagColors).map(([flagName, color]) => (
             <TouchableOpacity
               key={flagName}
-              style={[styles.flagButton, flag === flagName && styles.selectedFlag, { backgroundColor: color }]}
+              style={[
+                styles.flagButton,
+                flag === flagName && styles.selectedFlag,
+                { backgroundColor: color },
+                flagName === "none" && { borderWidth: 1, borderColor: "#ccc", backgroundColor: "transparent" },
+              ]}
               onPress={() => setFlag(flagName)}
             >
               {flag === flagName && <Ionicons name="checkmark" size={16} color="#fff" />}
+              {flagName === "none" && flag !== "none" && <ThemedText style={{ fontSize: 10 }}>None</ThemedText>}
             </TouchableOpacity>
           ))}
         </View>
@@ -308,7 +347,7 @@ const AddTransactionsScreen: React.FC = () => {
           <Picker
             selectedValue={repeat}
             onValueChange={(itemValue) => setRepeat(itemValue as string)}
-            style={styles.repeatPicker}
+            style={[styles.repeatPicker, { height: 45 }]}
             dropdownIconColor={textColor}
           >
             <Picker.Item label="Never" value="never" />
@@ -319,8 +358,21 @@ const AddTransactionsScreen: React.FC = () => {
           </Picker>
         </View>
 
-        <TouchableOpacity style={[styles.button, { backgroundColor: tintColor }]} onPress={handleAddTransaction}>
-          <ThemedText style={styles.buttonText}>Add Transaction</ThemedText>
+        <TouchableOpacity
+          style={[
+            styles.button,
+            {
+              backgroundColor: submitting ? "#ccc" : tintColor,
+              opacity: submitting ? 0.7 : 1,
+              height: 50,
+              marginTop: 20,
+              marginBottom: 30,
+            },
+          ]}
+          onPress={handleAddTransaction}
+          disabled={submitting}
+        >
+          {submitting ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.buttonText}>Save Transaction</ThemedText>}
         </TouchableOpacity>
       </ScrollView>
     </ThemedView>
@@ -328,38 +380,53 @@ const AddTransactionsScreen: React.FC = () => {
 };
 
 export default AddTransactionsScreen;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
     paddingBottom: 40,
   },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 20, marginTop: 40 },
-  label: { fontSize: 16, marginBottom: 5 },
-  input: { marginBottom: 15, padding: 10, borderWidth: 1, borderColor: "#ccc", borderRadius: 5 },
-  button: { padding: 15, borderRadius: 5 },
+  title: { fontSize: 26, fontWeight: "bold", marginBottom: 25, marginTop: 30 },
+  label: { fontSize: 15, marginBottom: 6, fontWeight: "500" },
+  input: { marginBottom: 15, padding: 10, borderWidth: 1, borderColor: "#ccc", borderRadius: 5, height: 45 },
+  button: { padding: 15, borderRadius: 5, height: 50, marginTop: 20, marginBottom: 30, alignItems: "center", justifyContent: "center" },
   buttonText: { color: "white", fontSize: 16, fontWeight: "bold", textAlign: "center" },
   rowContainer: { flexDirection: "column", marginBottom: 10 },
-  pickerContainer: { borderWidth: 1, borderRadius: 5, marginBottom: 10 },
-  picker: { height: 50 },
-  dateButton: { padding: 10, borderRadius: 5, borderWidth: 1, marginBottom: 10, alignItems: "center" },
-  switchContainer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  pickerContainer: { borderWidth: 1, borderRadius: 5, marginBottom: 15 },
+  picker: { height: 45, paddingHorizontal: 10 },
+  dateButton: {
+    padding: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    marginBottom: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    height: 45,
+  },
+  switchContainer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginVertical: 15 },
   flagContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", marginBottom: 20 },
-  flagButton: { width: 40, height: 40, borderRadius: 20, margin: 5, alignItems: "center", justifyContent: "center" },
+  flagButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    margin: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
   selectedFlag: { borderWidth: 2, borderColor: "#000" },
   flowTypeContainer: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   flowTypeButton: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 5,
     borderRadius: 5,
     borderWidth: 1,
-    marginHorizontal: 2.5,
+    marginHorizontal: 3,
     alignItems: "center",
   },
-  selectedFlowType: {},
-  selectedFlowText: { color: "white", fontWeight: "bold" },
+  selectedFlowText: { color: "white", fontWeight: "600" },
   repeatPickerContainer: {
     borderWidth: 1,
     borderRadius: 5,
@@ -373,5 +440,14 @@ const styles = StyleSheet.create({
   repeatPicker: {
     width: "100%",
     color: "#333",
+  },
+  formSectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 25,
+    marginBottom: 12,
+    paddingBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: "#333333",
   },
 });
