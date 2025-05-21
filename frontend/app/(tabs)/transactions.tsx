@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, Alert, ActivityIndicator } from "react-native";
+import { View, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, Alert, ActivityIndicator, RefreshControl } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -11,6 +11,7 @@ interface Transaction {
   id: string;
   description: string;
   amount: number;
+  date: string;
   account?: {
     name: string;
   };
@@ -41,6 +42,7 @@ export default function TransactionsScreen() {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const textColor = useThemeColor({}, "text");
   const tintColor = useThemeColor({}, "tint");
@@ -49,11 +51,13 @@ export default function TransactionsScreen() {
       setLoading(true);
       try {
         const data = await getTransactions(token);
-        setTransactions(data);
+        const sortedData = data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setTransactions(sortedData);
       } catch (error) {
         console.error("Error loading transactions:", error);
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     }
   };
@@ -102,6 +106,7 @@ export default function TransactionsScreen() {
           description,
           amount: amountInCents,
           accountId: selectedAccountId,
+          date: new Date().toISOString(),
         }),
       });
       if (!response.ok) {
@@ -120,6 +125,7 @@ export default function TransactionsScreen() {
   const renderTransaction = ({ item }: { item: Transaction }) => {
     const isPositive = item.amount > 0;
     const formattedAmount = `${isPositive ? "+" : "-"}$${Math.abs(item.amount / 100).toFixed(2)}`;
+    const transactionDate = item.date ? new Date(item.date).toLocaleDateString() : "";
 
     return (
       <View style={styles.transactionItem}>
@@ -132,6 +138,11 @@ export default function TransactionsScreen() {
     );
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadTransactions();
+  };
+
   return (
     <ThemedView style={styles.container}>
       <ThemedText style={styles.title}>Transactions</ThemedText>
@@ -140,6 +151,7 @@ export default function TransactionsScreen() {
         renderItem={renderTransaction}
         keyExtractor={(item) => item.id}
         style={styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[tintColor]} tintColor={tintColor} />}
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
             <ThemedText style={styles.emptyText}>No transactions yet</ThemedText>
@@ -225,4 +237,6 @@ const styles = StyleSheet.create({
   buttonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "bold" },
   emptyContainer: { alignItems: "center", paddingVertical: 20 },
   emptyText: { color: "#666666" },
+  date: { fontSize: 12, color: "#888888" },
+  descriptionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 });

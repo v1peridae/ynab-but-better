@@ -111,7 +111,7 @@ app.post("/transactions", verifyAuth, async (req, res) => {
         },
       });
     }
-    const budgetItem = await prisma.budgetItem.upsert({
+    const budgetItem = await prisma.budgetItems.upsert({
       where: {
         budgetMonthId_categoryId: {
           budgetMonthId: budgetMonth.id,
@@ -320,7 +320,7 @@ app.post("/categories", verifyAuth, async (req, res) => {
 
 app.get("/budget/:month", verifyAuth, async (req, res) => {
   const month = req.params.month;
-  const items = await prisma.budgetItem.findMany({
+  const items = await prisma.budgetItems.findMany({
     where: {
       month,
       userId: req.user.userId,
@@ -393,7 +393,7 @@ app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
     });
   }
 
-  const existingItem = await prisma.budgetItem.findUnique({
+  const existingItem = await prisma.budgetItems.findUnique({
     where: {
       budgetMonthId_categoryId: {
         budgetMonthId: budgetMonth.id,
@@ -403,7 +403,7 @@ app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
   });
 
   const spent = existingItem?.spent || 0;
-  const item = await prisma.budgetItem.upsert({
+  const item = await prisma.budgetItems.upsert({
     where: {
       budgetMonthId_categoryId: {
         budgetMonthId: budgetMonth.id,
@@ -457,7 +457,7 @@ app.post("/budget/:month/rollover", verifyAuth, async (req, res) => {
   for (const item of current.items) {
     const rolloverAmount = item.available;
     if (rolloverAmount <= 0) continue;
-    await prisma.budgetItem.upsert({
+    await prisma.budgetItems.upsert({
       where: {
         budgetMonthId_categoryId: {
           budgetMonthId: next.id,
@@ -499,7 +499,7 @@ app.delete("/categories/:id", [verifyAuth, verifyAccountOwner], async (req, res)
     const transactionsUsingCategory = await prisma.transaction.count({
       where: { categoryId },
     });
-    const budgetItemsUsingCategory = await prisma.budgetItem.count({
+    const budgetItemsUsingCategory = await prisma.budgetItems.count({
       where: { categoryId },
     });
     if (transactionsUsingCategory > 0 || budgetItemsUsingCategory > 0) {
