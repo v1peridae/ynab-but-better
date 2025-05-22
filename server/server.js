@@ -320,18 +320,34 @@ app.post("/categories", verifyAuth, async (req, res) => {
 
 app.get("/budget/:month", verifyAuth, async (req, res) => {
   const month = req.params.month;
-  const items = await prisma.budgetItems.findMany({
-    where: {
-      month,
-      userId: req.user.userId,
-    },
-    include: { category: true },
-  });
-  res.json(items);
+  try {
+    const budgetMonth = await prisma.budgetMonth.findFirst({
+      where: {
+        month: month,
+        userId: req.user.userId,
+      },
+    });
+
+    if (!budgetMonth) {
+      return res.json([]);
+    }
+
+    const items = await prisma.budgetItems.findMany({
+      where: {
+        budgetMonthId: budgetMonth.id,
+      },
+      include: { category: true },
+    });
+
+    res.json(items);
+  } catch (error) {
+    console.error("Error fetching budget items:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 app.post("/user/onboarding", verifyAuth, async (req, res) => {
-  const { name, account, categories } = req.body;
+  const { name, accounts, categories } = req.body;
   try {
     await prisma.user.update({
       where: { id: req.user.userId },
@@ -637,7 +653,7 @@ app.get("/report/trends", verifyAuth, async (req, res) => {
 app.get("/user/profile", verifyAuth, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user.userId },
-    select: { email: true, createdAt: true, preferences: true },
+    select: { email: true, name: true, preferences: true },
   });
   res.json(user);
 });

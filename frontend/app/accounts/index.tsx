@@ -129,6 +129,6 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 60 },
   emptyText: { fontSize: 18, fontWeight: "bold", marginBottom: 16 },
   emptySubtext: { fontSize: 14, textAlign: "center", opacity: 0.7, marginTop: 8, marginHorizontal: 32 },
-  emptyAddButton: { backgroundColor: "#0a7ea4", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8, marginTop: 24 },
+  emptyAddButton: { backgroundColor: "#000000", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8, marginTop: 24 },
   emptyAddButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });

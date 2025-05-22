@@ -60,7 +60,7 @@ router.post("/signup", [body("email").isEmail().withMessage("Invalid email"), bo
       },
     });
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     const refreshToken = uuidv4();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
@@ -101,7 +101,7 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     const refreshToken = uuidv4();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
@@ -137,7 +137,7 @@ router.post("/refresh-token", async (req, res) => {
       return res.status(401).json({ message: "Invalid or expired refresh token" });
     }
 
-    const accessToken = jwt.sign({ userId: storedToken.userId }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const accessToken = jwt.sign({ userId: storedToken.userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
     res.json({ token: accessToken });
   } catch (error) {
     console.error("Error refreshing token", error);

@@ -6,6 +6,11 @@ import { useThemeColor } from "@/hooks/useThemeColor";
 import { useAuth } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL } from "@/constants/apiurl";
+import { router } from "expo-router";
+
+const navToAssign = () => {
+  router.push("/assign");
+};
 
 const fetchDashboardData = async (token: string): Promise<any> => {
   try {
@@ -34,9 +39,27 @@ const fetchDashboardData = async (token: string): Promise<any> => {
   }
 };
 
+const fetchUserProfile = async (token: string): Promise<any> => {
+  try {
+    const response = await fetch(`${API_URL}/user/profile`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error("Failed to fetch user profile");
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    return { name: "User" };
+  }
+};
+
 export default function IndexScreen() {
   const { token, logout } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("User");
   const [dashboardData, setDashboardData] = useState({
     totalBalance: 0,
     accounts: [],
@@ -54,10 +77,13 @@ export default function IndexScreen() {
       if (token) {
         setLoading(true);
         try {
-          const data = await fetchDashboardData(token);
+          const [data, profile] = await Promise.all([fetchDashboardData(token), fetchUserProfile(token)]);
           setDashboardData(data);
+          if (profile && profile.name) {
+            setUserName(profile.name);
+          }
         } catch (error) {
-          console.error("Error fetching dashboard data:", error);
+          console.error("Error fetching data:", error);
           setDashboardData({
             totalBalance: 0,
             accounts: [],
@@ -120,7 +146,7 @@ export default function IndexScreen() {
     <ThemedView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <ThemedText style={styles.welcomeText}>Welcome back,</ThemedText>
+          <ThemedText style={styles.welcomeText}>Welcome back, {userName}</ThemedText>
         </View>
         <TouchableOpacity onPress={logout} style={styles.settingsButton}>
           <Ionicons name="log-out-outline" size={24} color="#fff" />
@@ -138,6 +164,9 @@ export default function IndexScreen() {
           <ThemedText style={styles.balanceValue}>${unassignedAmount}</ThemedText>
         </View>
       </View>
+      <TouchableOpacity onPress={navToAssign} style={styles.assignButton}>
+        <ThemedText style={styles.assignButtonText}>Assign</ThemedText>
+      </TouchableOpacity>
 
       <View style={styles.section}>
         <ThemedText style={styles.sectionTitle}>Spending</ThemedText>
@@ -207,4 +236,13 @@ const styles = StyleSheet.create({
   summaryGridLabel: { fontSize: 12, textAlign: "center", marginBottom: 4, color: "#666666", lineHeight: 14 },
   summaryGridValue: { fontSize: 14, fontWeight: "bold", textAlign: "center", marginTop: 4 },
   settingsButton: { padding: 5 },
+  assignButton: {
+    backgroundColor: "#000000",
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 16,
+    alignItems: "center",
+  },
+  assignButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });
