@@ -719,11 +719,25 @@ app.patch("/user/password", verifyAuth, async (req, res) => {
 });
 
 app.patch("/user/preferences", verifyAuth, async (req, res) => {
-  const { currency, dateFormat } = req.body;
+  const { currency, dateFormat, theme, notifications } = req.body;
+  const currentUser = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+  });
+
+  const currentPreferences = currentUser?.preferences || {};
+  const updatedPreferences = {
+    ...currentPreferences,
+    ...(currency !== undefined && { currency }),
+    ...(dateFormat !== undefined && { dateFormat }),
+    ...(theme !== undefined && { theme }),
+    ...(notifications !== undefined && { notifications }),
+  };
+
   const user = await prisma.user.update({
     where: { id: req.user.userId },
-    data: { preferences: { currency, dateFormat } },
+    data: { preferences: updatedPreferences },
   });
+
   res.json({ message: "Preferences updated" });
 });
 

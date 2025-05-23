@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { View, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, Alert, ActivityIndicator, RefreshControl } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { ThemedView } from "@/components/ThemedView";
@@ -37,7 +37,7 @@ const getTransactions = async (token: string): Promise<any[]> => {
 export default function TransactionsScreen() {
   const { token } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -46,7 +46,8 @@ export default function TransactionsScreen() {
   const [accounts, setAccounts] = useState([]);
   const textColor = useThemeColor({}, "text");
   const tintColor = useThemeColor({}, "tint");
-  const loadTransactions = async () => {
+
+  const loadTransactions = useCallback(async () => {
     if (token) {
       setLoading(true);
       try {
@@ -60,29 +61,30 @@ export default function TransactionsScreen() {
         setRefreshing(false);
       }
     }
-  };
-  useEffect(() => {
-    const fetchAccounts = async () => {
-      if (token) {
-        try {
-          const response = await fetch(`${API_URL}/accounts`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          if (response.ok) {
-            const data = await response.json();
-            setAccounts(data);
-          }
-        } catch (error) {
-          console.error("Error fetching accounts:", error);
-        }
-      }
-    };
+  }, [token]);
 
+  const fetchAccounts = useCallback(async () => {
+    if (token) {
+      try {
+        const response = await fetch(`${API_URL}/accounts`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setAccounts(data);
+        }
+      } catch (error) {
+        console.error("Error fetching accounts:", error);
+      }
+    }
+  }, [token]);
+
+  useEffect(() => {
     fetchAccounts();
     loadTransactions();
-  }, [token]);
+  }, [fetchAccounts, loadTransactions]);
 
   const handleAddTransaction = async () => {
     if (!description || !amount) {
@@ -118,14 +120,14 @@ export default function TransactionsScreen() {
       setModalVisible(false);
 
       loadTransactions();
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to add transaction");
     }
   };
+
   const renderTransaction = ({ item }: { item: Transaction }) => {
     const isPositive = item.amount > 0;
     const formattedAmount = `${isPositive ? "+" : "-"}$${Math.abs(item.amount / 100).toFixed(2)}`;
-    const transactionDate = item.date ? new Date(item.date).toLocaleDateString() : "";
 
     return (
       <View style={styles.transactionItem}>

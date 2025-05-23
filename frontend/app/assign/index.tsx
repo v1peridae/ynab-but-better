@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -51,29 +51,7 @@ export default function AssignScreen() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
-  useEffect(() => {
-    const now = new Date();
-    const month = now.toISOString().slice(0, 7);
-    setCurrentMonth(month);
-
-    if (token) {
-      fetchData(month);
-      fetchAccounts();
-    }
-  }, [token]);
-
-  useEffect(() => {
-    if (accounts.length > 0 || Object.keys(budgetItems).length > 0) {
-      const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
-      const totalBudgeted = Object.values(budgetItems).reduce((sum, item) => sum + (item.amount || 0), 0);
-      setUnassignedAmount(totalAccountBalances - totalBudgeted);
-    } else {
-      const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
-      setUnassignedAmount(totalAccountBalances);
-    }
-  }, [accounts, budgetItems]);
-
-  const fetchAccounts = async () => {
+  const fetchAccounts = useCallback(async () => {
     try {
       const accountsRes = await fetch(`${API_URL}/accounts`, {
         headers: {
@@ -90,67 +68,85 @@ export default function AssignScreen() {
     } catch (error) {
       console.error("Error fetching accounts:", error);
     }
-  };
+  }, [token]);
 
-  const fetchData = async (month: string) => {
-    setLoading(true);
-    try {
-      const [categoriesRes, dashboardRes] = await Promise.all([
-        fetch(`${API_URL}/categories`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }),
-        fetch(`${API_URL}/user/dashboard`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }),
-      ]);
-
-      const categoriesData = (await categoriesRes.json()) as CategoryResponse[];
-      const dashboardData = (await dashboardRes.json()) as DashboardResponse;
-
-      setCategories(categoriesData);
-
+  const fetchData = useCallback(
+    async (month: string) => {
+      setLoading(true);
       try {
-        console.log(`Fetching budget data for month: ${month}`);
+        const [categoriesRes] = await Promise.all([
+          fetch(`${API_URL}/categories`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+        ]);
 
-        const budgetRes = await fetch(`${API_URL}/budget/${month}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const categoriesData = (await categoriesRes.json()) as CategoryResponse[];
+        setCategories(categoriesData);
 
-        if (!budgetRes.ok) {
-          console.log(`Budget fetch returned status: ${budgetRes.status}`);
-          setBudgetItems({});
-        } else {
-          const budgetData = (await budgetRes.json()) as BudgetItemResponse[];
-          console.log("Budget data response:", budgetData);
+        try {
+          console.log(`Fetching budget data for month: ${month}`);
 
-          const budgetMap: Record<number, BudgetItem> = {};
-          if (Array.isArray(budgetData)) {
-            budgetData.forEach((item) => {
-              budgetMap[item.categoryId] = {
-                amount: item.amount / 100,
-                spent: item.spent / 100,
-                available: item.available / 100,
-              };
-            });
+          const budgetRes = await fetch(`${API_URL}/budget/${month}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!budgetRes.ok) {
+            console.log(`Budget fetch returned status: ${budgetRes.status}`);
+            setBudgetItems({});
+          } else {
+            const budgetData = (await budgetRes.json()) as BudgetItemResponse[];
+            console.log("Budget data response:", budgetData);
+
+            const budgetMap: Record<number, BudgetItem> = {};
+            if (Array.isArray(budgetData)) {
+              budgetData.forEach((item) => {
+                budgetMap[item.categoryId] = {
+                  amount: item.amount / 100,
+                  spent: item.spent / 100,
+                  available: item.available / 100,
+                };
+              });
+            }
+            setBudgetItems(budgetMap);
           }
-          setBudgetItems(budgetMap);
+        } catch (error) {
+          console.error("Error fetching budget data:", error);
+          setBudgetItems({});
         }
       } catch (error) {
         console.error("Error fetching budget data:", error);
-        setBudgetItems({});
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching budget data:", error);
-    } finally {
-      setLoading(false);
+    },
+    [token]
+  );
+
+  useEffect(() => {
+    const now = new Date();
+    const month = now.toISOString().slice(0, 7);
+    setCurrentMonth(month);
+
+    if (token) {
+      fetchData(month);
+      fetchAccounts();
     }
-  };
+  }, [token, fetchData, fetchAccounts]);
+
+  useEffect(() => {
+    if (accounts.length > 0 || Object.keys(budgetItems).length > 0) {
+      const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
+      const totalBudgeted = Object.values(budgetItems).reduce((sum, item) => sum + (item.amount || 0), 0);
+      setUnassignedAmount(totalAccountBalances - totalBudgeted);
+    } else {
+      const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
+      setUnassignedAmount(totalAccountBalances);
+    }
+  }, [accounts, budgetItems]);
 
   const updateBudgetItem = async (categoryId: number, amount: string) => {
     const numAmount = parseFloat(amount) || 0;

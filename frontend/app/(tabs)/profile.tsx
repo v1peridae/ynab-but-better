@@ -7,10 +7,14 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
 
   const navigateToAccounts = () => {
     router.push("/accounts");
+  };
+
+  const navigateToSettings = () => {
+    router.push("/settings");
   };
 
   return (
@@ -24,7 +28,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={20} color="#666" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={navigateToSettings}>
           <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
           <ThemedText style={styles.menuText}>Settings</ThemedText>
           <Ionicons name="chevron-forward" size={20} color="#666" />
