@@ -35,6 +35,12 @@ interface BudgetItem {
   available: number;
 }
 
+interface Account {
+  id: number;
+  name: string;
+  balance: number;
+}
+
 export default function AssignScreen() {
   const { token } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -42,6 +48,8 @@ export default function AssignScreen() {
   const [budgetItems, setBudgetItems] = useState<Record<number, BudgetItem>>({});
   const [unassignedAmount, setUnassignedAmount] = useState(0);
   const [currentMonth, setCurrentMonth] = useState("");
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
   useEffect(() => {
     const now = new Date();
@@ -50,8 +58,39 @@ export default function AssignScreen() {
 
     if (token) {
       fetchData(month);
+      fetchAccounts();
     }
   }, [token]);
+
+  useEffect(() => {
+    if (accounts.length > 0 || Object.keys(budgetItems).length > 0) {
+      const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
+      const totalBudgeted = Object.values(budgetItems).reduce((sum, item) => sum + (item.amount || 0), 0);
+      setUnassignedAmount(totalAccountBalances - totalBudgeted);
+    } else {
+      const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
+      setUnassignedAmount(totalAccountBalances);
+    }
+  }, [accounts, budgetItems]);
+
+  const fetchAccounts = async () => {
+    try {
+      const accountsRes = await fetch(`${API_URL}/accounts`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const accountsData = await accountsRes.json();
+      setAccounts(accountsData);
+
+      if (accountsData.length > 0) {
+        setSelectedAccount(accountsData[0]);
+      }
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+    }
+  };
 
   const fetchData = async (month: string) => {
     setLoading(true);
@@ -73,7 +112,6 @@ export default function AssignScreen() {
       const dashboardData = (await dashboardRes.json()) as DashboardResponse;
 
       setCategories(categoriesData);
-      setUnassignedAmount(dashboardData.unassigned);
 
       try {
         console.log(`Fetching budget data for month: ${month}`);
@@ -113,13 +151,32 @@ export default function AssignScreen() {
       setLoading(false);
     }
   };
+
   const updateBudgetItem = async (categoryId: number, amount: string) => {
+    const numAmount = parseFloat(amount) || 0;
+
+    const newBudgetItems = {
+      ...budgetItems,
+      [categoryId]: {
+        ...(budgetItems[categoryId] || { spent: 0, available: 0 }),
+        amount: numAmount,
+        available: numAmount - (budgetItems[categoryId]?.spent || 0),
+      },
+    };
+    const newTotalBudgeted = Object.values(newBudgetItems).reduce((sum, item) => sum + (item.amount || 0), 0);
+    const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
+
+    if (newTotalBudgeted > totalAccountBalances) {
+      alert(`Total budgeted amount cannot exceed total available funds in accounts ($${totalAccountBalances.toFixed(2)}).`);
+      return;
+    }
+
     setBudgetItems((prev) => ({
       ...prev,
       [categoryId]: {
         ...(prev[categoryId] || { spent: 0, available: 0 }),
-        amount: parseFloat(amount),
-        available: parseFloat(amount) - (prev[categoryId]?.spent || 0),
+        amount: numAmount,
+        available: numAmount - (prev[categoryId]?.spent || 0),
       },
     }));
   };
@@ -136,6 +193,7 @@ export default function AssignScreen() {
         body: JSON.stringify({ amount: amountInCents }),
       });
       fetchData(currentMonth);
+      fetchAccounts();
     } catch (error) {
       console.error("Error saving budget item:", error);
     }
@@ -184,10 +242,37 @@ export default function AssignScreen() {
 
         <ThemedText style={styles.headerText}>Assign Budget</ThemedText>
       </View>
+
+      <View style={styles.accountSelector}>
+        <ThemedText style={styles.accountLabel}>Assign from account:</ThemedText>
+        <View style={styles.accountDropdown}>
+          {accounts.length > 0 ? (
+            <FlatList
+              horizontal
+              data={accounts}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.accountItem, selectedAccount?.id === item.id && styles.selectedAccountItem]}
+                  onPress={() => setSelectedAccount(item)}
+                >
+                  <ThemedText style={styles.accountName}>{item.name}</ThemedText>
+                  <ThemedText style={styles.accountBalance}>${item.balance.toFixed(2)}</ThemedText>
+                </TouchableOpacity>
+              )}
+              keyExtractor={(item) => item.id.toString()}
+              showsHorizontalScrollIndicator={false}
+            />
+          ) : (
+            <ThemedText style={styles.noAccountsText}>No accounts found</ThemedText>
+          )}
+        </View>
+      </View>
+
       <View style={styles.unassignedContainer}>
         <ThemedText style={styles.unassignedLabel}>Unassigned</ThemedText>
         <ThemedText style={styles.unassignedAmount}>${unassignedAmount.toFixed(2)}</ThemedText>
       </View>
+
       <FlatList
         data={categories}
         renderItem={renderCategoryItem}
@@ -236,4 +321,12 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, textAlign: "center", color: "#666" },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   headerText: { fontSize: 20, fontWeight: "bold", marginLeft: 10 },
+  accountSelector: { marginBottom: 15 },
+  accountLabel: { fontSize: 16, marginBottom: 8 },
+  accountDropdown: { backgroundColor: "#000000", borderRadius: 8, padding: 10 },
+  accountItem: { backgroundColor: "#222222", padding: 10, borderRadius: 5, marginRight: 10, minWidth: 120 },
+  selectedAccountItem: { backgroundColor: "#444444" },
+  accountName: { fontWeight: "bold", marginBottom: 4 },
+  accountBalance: { fontSize: 14 },
+  noAccountsText: { fontStyle: "italic", color: "#666" },
 });

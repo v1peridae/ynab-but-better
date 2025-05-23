@@ -12,6 +12,13 @@ const navToAssign = () => {
   router.push("/assign");
 };
 
+interface BudgetItemResponse {
+  categoryId: number;
+  amount: number;
+  spent: number;
+  available: number;
+}
+
 const fetchDashboardData = async (token: string): Promise<any> => {
   try {
     const response = await fetch(`${API_URL}/user/dashboard`, {
@@ -71,30 +78,68 @@ export default function IndexScreen() {
       weeklyChangePercent: 0,
     },
   });
+  const [calculatedLeftToAssign, setCalculatedLeftToAssign] = useState(0);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const loadData = async () => {
       if (token) {
         setLoading(true);
         try {
-          const [data, profile] = await Promise.all([fetchDashboardData(token), fetchUserProfile(token)]);
-          setDashboardData(data);
-          if (profile && profile.name) {
-            setUserName(profile.name);
+          const now = new Date();
+          const month = now.toISOString().slice(0, 7);
+
+          const [dashboardApiResponse, profileResponse, budgetMonthResponse] = await Promise.all([
+            fetch(`${API_URL}/user/dashboard`, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(`${API_URL}/user/profile`, { headers: { Authorization: `Bearer ${token}` } }),
+            fetch(`${API_URL}/budget/${month}`, { headers: { Authorization: `Bearer ${token}` } }),
+          ]);
+
+          let apiDashboardData = {
+            totalBalance: 0,
+            accounts: [],
+            recentTransactions: [],
+            unassigned: 0,
+            summary: { topPurchase: "Unknown", topCategory: "Unknown", weeklyChangePercent: 0 },
+          };
+          if (dashboardApiResponse.ok) {
+            apiDashboardData = await dashboardApiResponse.json();
+          } else {
+            console.error("Failed to fetch dashboard data from API");
           }
+          setDashboardData(apiDashboardData);
+
+          if (profileResponse.ok) {
+            const profile = await profileResponse.json();
+            if (profile && profile.name) {
+              setUserName(profile.name);
+            }
+          } else {
+            console.error("Failed to fetch user profile from API");
+          }
+
+          let currentMonthBudgetedInCents = 0;
+          if (budgetMonthResponse.ok) {
+            const budgetItems = (await budgetMonthResponse.json()) as BudgetItemResponse[];
+            if (Array.isArray(budgetItems)) {
+              currentMonthBudgetedInCents = budgetItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+            }
+          } else {
+            console.error(`Budget data fetch for month ${month} failed with status: ${budgetMonthResponse.status}`);
+          }
+
+          const totalBalanceInCents = apiDashboardData.totalBalance || 0;
+          setCalculatedLeftToAssign(totalBalanceInCents - currentMonthBudgetedInCents);
         } catch (error) {
-          console.error("Error fetching data:", error);
+          console.error("Error fetching data in IndexScreen:", error);
           setDashboardData({
             totalBalance: 0,
             accounts: [],
             recentTransactions: [],
             unassigned: 0,
-            summary: {
-              topPurchase: "Unknown",
-              topCategory: "Unknown",
-              weeklyChangePercent: 0,
-            },
+            summary: { topPurchase: "Unknown", topCategory: "Unknown", weeklyChangePercent: 0 },
           });
+          setUserName("User");
+          setCalculatedLeftToAssign(0);
         } finally {
           setLoading(false);
         }
@@ -105,15 +150,12 @@ export default function IndexScreen() {
           accounts: [],
           recentTransactions: [],
           unassigned: 0,
-          summary: {
-            topPurchase: "Unknown",
-            topCategory: "Unknown",
-            weeklyChangePercent: 0,
-          },
+          summary: { topPurchase: "Unknown", topCategory: "Unknown", weeklyChangePercent: 0 },
         });
+        setCalculatedLeftToAssign(0);
       }
     };
-    fetchData();
+    loadData();
   }, [token]);
 
   const renderTransactionItem = ({ item }: { item: any }) => (
@@ -136,7 +178,7 @@ export default function IndexScreen() {
 
   const formattedTotalBalance = (dashboardData.totalBalance / 100).toFixed(2);
   const spentBalance = (dashboardData.totalBalance / 100).toFixed(2);
-  const unassignedAmount = (dashboardData.unassigned / 100).toFixed(2);
+  const leftToAssignDisplay = (calculatedLeftToAssign / 100).toFixed(2);
 
   const weeklyChangePercent = dashboardData.summary.weeklyChangePercent;
   const isPositiveChange = weeklyChangePercent > 0;
@@ -161,7 +203,7 @@ export default function IndexScreen() {
         <ThemedText style={styles.totalBalance}>${formattedTotalBalance}</ThemedText>
         <View style={styles.balanceRow}>
           <ThemedText style={styles.balanceLabel}>Left to assign</ThemedText>
-          <ThemedText style={styles.balanceValue}>${unassignedAmount}</ThemedText>
+          <ThemedText style={styles.balanceValue}>${leftToAssignDisplay}</ThemedText>
         </View>
       </View>
       <TouchableOpacity onPress={navToAssign} style={styles.assignButton}>

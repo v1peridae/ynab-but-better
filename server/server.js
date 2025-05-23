@@ -85,54 +85,117 @@ app.get("/accounts", verifyAuth, async (req, res) => {
   res.json(accounts);
 });
 
+async function applyExpenseDelta(transaction, userId, categoryId, dateIso, deltaCents) {
+  if (deltaCents === 0 || !categoryId) return;
+  const month = dateIso.slice(0, 7);
+  const abs = Math.abs(deltaCents);
+
+  const budgetMonth = await transaction.budgetMonth.upsert({
+    where: { userId_month: { userId, month } },
+    update: {},
+    create: { userId, month },
+  });
+
+  await transaction.budgetItems.upsert({
+    where: { budgetMonthId_categoryId: { budgetMonthId: budgetMonth.id, categoryId } },
+    update: {
+      spent: { increment: abs * (deltaCents < 0 ? 1 : -1) },
+      available: { decrement: abs * (deltaCents < 0 ? 1 : -1) },
+    },
+    create: {
+      budgetMonthId: budgetMonth.id,
+      categoryId,
+      amount: 0,
+      spent: deltaCents < 0 ? abs : 0,
+      available: deltaCents < 0 ? -abs : 0,
+    },
+  });
+}
+
 app.post("/transactions", verifyAuth, async (req, res) => {
   const { amount, accountId, description, categoryId } = req.body;
-  const transaction = await prisma.transaction.create({
-    data: { amount, accountId, description, categoryId, userId: req.user.userId },
-  });
-  await prisma.account.update({
-    where: { id: accountId },
-    data: { balance: { increment: amount } },
-  });
-  if (categoryId) {
-    const transactionDate = transaction.date;
-    const transactionMonth = new Date(transactionDate).toISOString().slice(0, 7);
-    let budgetMonth = await prisma.budgetMonth.findFirst({
-      where: {
-        month: transactionMonth,
-        userId: req.user.userId,
-      },
-    });
-    if (!budgetMonth) {
-      budgetMonth = await prisma.budgetMonth.create({
-        data: {
-          month: transactionMonth,
-          userId: req.user.userId,
-        },
-      });
-    }
-    const budgetItem = await prisma.budgetItems.upsert({
-      where: {
-        budgetMonthId_categoryId: {
-          budgetMonthId: budgetMonth.id,
-          categoryId: categoryId,
-        },
-      },
-      update: {
-        spent: { increment: amount },
-        available: { decrement: amount },
-      },
-      create: {
-        budgetMonthId: budgetMonth.id,
-        categoryId: categoryId,
-        amount: 0,
-        spent: amount,
-        available: -amount,
-      },
-    });
-  }
 
-  res.status(201).json({ message: "Transaction Created", transactionId: transaction.id });
+  const created = await prisma.$transaction(async (dbTransaction) => {
+    const transactionRecord = await dbTransaction.transaction.create({
+      data: { amount, accountId, description, categoryId, userId: req.user.userId },
+    });
+
+    await dbTransaction.account.update({
+      where: { id: accountId },
+      data: { balance: { increment: amount } },
+    });
+
+    if (categoryId && amount < 0) {
+      await applyExpenseDelta(dbTransaction, req.user.userId, categoryId, transactionRecord.date.toISOString(), amount);
+    }
+    return transactionRecord;
+  });
+
+  res.status(201).json({ message: "Transaction Created", transactionId: created.id });
+});
+
+app.patch("/transactions/:id", [verifyAuth, verifyTransactionOwner], async (req, res) => {
+  const { amount, accountId, description, categoryId } = req.body;
+  const id = Number(req.params.id);
+
+  await prisma.$transaction(async (dbTransaction) => {
+    const originalTransaction = await dbTransaction.transaction.findUnique({ where: { id } });
+    if (!originalTransaction) throw new Error("Transaction not found");
+
+    await dbTransaction.account.update({
+      where: { id: originalTransaction.accountId },
+      data: { balance: { decrement: originalTransaction.amount } },
+    });
+    if (originalTransaction.categoryId && originalTransaction.amount < 0) {
+      await applyExpenseDelta(
+        dbTransaction,
+        req.user.userId,
+        originalTransaction.categoryId,
+        originalTransaction.date.toISOString(),
+        -originalTransaction.amount
+      );
+    }
+
+    const updatedTransaction = await dbTransaction.transaction.update({
+      where: { id },
+      data: { amount, accountId, description, categoryId },
+    });
+
+    await dbTransaction.account.update({
+      where: { id: accountId },
+      data: { balance: { increment: amount } },
+    });
+    if (categoryId && amount < 0) {
+      await applyExpenseDelta(dbTransaction, req.user.userId, categoryId, updatedTransaction.date.toISOString(), amount);
+    }
+  });
+
+  res.json({ message: "Transaction Updated" });
+});
+
+app.delete("/transactions/:id", [verifyAuth, verifyTransactionOwner], async (req, res) => {
+  const id = Number(req.params.id);
+
+  await prisma.$transaction(async (dbTransaction) => {
+    const transactionRecord = await dbTransaction.transaction.delete({ where: { id } });
+
+    await dbTransaction.account.update({
+      where: { id: transactionRecord.accountId },
+      data: { balance: { decrement: transactionRecord.amount } },
+    });
+
+    if (transactionRecord.categoryId && transactionRecord.amount < 0) {
+      await applyExpenseDelta(
+        dbTransaction,
+        req.user.userId,
+        transactionRecord.categoryId,
+        transactionRecord.date.toISOString(),
+        -transactionRecord.amount
+      );
+    }
+  });
+
+  res.status(204).send();
 });
 
 app.post("/accounts", verifyAuth, async (req, res) => {
@@ -160,47 +223,22 @@ app.delete("/accounts/:id", [verifyAuth, verifyAccountOwner], async (req, res) =
 });
 
 app.get("/user/dashboard", verifyAuth, async (req, res) => {
+  // 1️⃣  Cash on hand
+  const accounts = await prisma.account.findMany({ where: { userId: req.user.userId } });
+  const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+  // 2️⃣  How much of that cash have I already assigned this month?
+  const month = new Date().toISOString().slice(0, 7);
+  const budgetMonth = await prisma.budgetMonth.findFirst({
+    where: { userId: req.user.userId, month },
+    include: { items: { select: { amount: true } } },
+  });
+  const totalBudgeted = budgetMonth ? budgetMonth.items.reduce((sum, i) => sum + i.amount, 0) : 0;
+
+  // 3️⃣  READY-TO-ASSIGN number
+  const unassigned = totalBalance - totalBudgeted;
+
   try {
-    const accounts = await prisma.account.findMany({
-      where: { userId: req.user.userId },
-    });
-    const totalBalance = accounts.reduce((acc, account) => acc + account.balance, 0);
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    let unassigned = 0;
-
-    const year = parseInt(currentMonth.substring(0, 4));
-    const month = parseInt(currentMonth.substring(5, 7)) - 1;
-    const firstDayCurrentMonth = new Date(Date.UTC(year, month, 1));
-    const firstDayNextMonth = new Date(Date.UTC(year, month + 1, 1));
-    const incomeTransactions = await prisma.transaction.findMany({
-      where: {
-        userId: req.user.userId,
-        date: {
-          gte: firstDayCurrentMonth,
-          lt: firstDayNextMonth,
-        },
-        amount: { gt: 0 },
-      },
-    });
-    const totalIncomeThisMonth = incomeTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
-    let totalBudgetedThisMonth = 0;
-    const budgetMonth = await prisma.budgetMonth.findFirst({
-      where: {
-        month: currentMonth,
-        userId: req.user.userId,
-      },
-      include: {
-        items: {
-          select: { amount: true },
-        },
-      },
-    });
-
-    if (budgetMonth && budgetMonth.items) {
-      totalBudgetedThisMonth = budgetMonth.items.reduce((sum, item) => sum + item.amount, 0);
-    }
-    unassigned = totalIncomeThisMonth - totalBudgetedThisMonth;
-
     const recentTransactions = await prisma.transaction.findMany({
       where: { userId: req.user.userId },
       orderBy: { date: "desc" },
@@ -285,22 +323,6 @@ app.get("/transactions", verifyAuth, async (req, res) => {
     where: { userId: req.user.userId },
   });
   res.json(transactions);
-});
-
-app.patch("/transactions/:id", [verifyAuth, verifyTransactionOwner], async (req, res) => {
-  const { amount, accountId, description } = req.body;
-  const transaction = await prisma.transaction.update({
-    where: { id: Number(req.params.id) },
-    data: { amount, accountId, description },
-  });
-  res.json(transaction);
-});
-
-app.delete("/transactions/:id", [verifyAuth, verifyTransactionOwner], async (req, res) => {
-  await prisma.transaction.delete({
-    where: { id: Number(req.params.id) },
-  });
-  res.status(204).send();
 });
 
 app.get("/categories", verifyAuth, async (req, res) => {
@@ -393,6 +415,26 @@ app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
   const { amount } = req.body;
   const month = req.params.month;
   const categoryId = Number(req.params.id);
+
+  const [
+    {
+      _sum: { balance = 0 },
+    },
+    {
+      _sum: { amount: already = 0 },
+    },
+  ] = await Promise.all([
+    prisma.account.aggregate({ _sum: { balance: true }, where: { userId: req.user.userId } }),
+    prisma.budgetItems.aggregate({
+      _sum: { amount: true },
+      where: {
+        budgetMonth: { month, userId: req.user.userId },
+        NOT: { categoryId },
+      },
+    }),
+  ]);
+
+  if (already + amount > balance) return res.status(400).json({ error: "Cannot budget more than available cash" });
 
   let budgetMonth = await prisma.budgetMonth.findFirst({
     where: {
