@@ -7,9 +7,12 @@ import { ThemedText } from "@/components/ThemedText";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useAuth } from "@/context/AuthContext";
 import { API_URL } from "@/constants/apiurl";
+import { usePreferences } from "@/context/PreferencesContext";
+import { FormattedDate } from "@/components/FormattedDate";
 
 export default function AddTransactionScreen() {
   const { token } = useAuth();
+  const { preferences, formatDate } = usePreferences();
   const textColor = useThemeColor({}, "text");
   const tintColor = useThemeColor({}, "tint");
   const backgroundColor = useThemeColor({}, "background");
@@ -36,8 +39,8 @@ export default function AddTransactionScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Data fetching states
-  const [accounts, setAccounts] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Flag color options
@@ -243,7 +246,7 @@ export default function AddTransactionScreen() {
         <ThemedText style={styles.label}>Amount</ThemedText>
         <TextInput
           style={[styles.input, { color: textColor, borderColor: textColor }]}
-          placeholder="0.00"
+          placeholder={`0.00 ${preferences.currency}`}
           placeholderTextColor="#888"
           value={amount}
           onChangeText={setAmount}
@@ -286,7 +289,7 @@ export default function AddTransactionScreen() {
         {/* Date */}
         <ThemedText style={styles.label}>Date</ThemedText>
         <TouchableOpacity style={[styles.dropdownButton, { borderColor: textColor }]} onPress={() => setShowDatePicker(true)}>
-          <ThemedText>{date.toLocaleDateString()}</ThemedText>
+          <FormattedDate date={date} />
         </TouchableOpacity>
 
         {/* Repeat */}

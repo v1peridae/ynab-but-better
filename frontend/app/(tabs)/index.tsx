@@ -6,6 +6,8 @@ import { useAuth } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { API_URL } from "@/constants/apiurl";
 import { router } from "expo-router";
+import { usePreferences } from "@/context/PreferencesContext";
+import { FormattedCurrency } from "@/components/FormattedCurrency";
 
 const navToAssign = () => {
   router.push("/assign");
@@ -63,6 +65,7 @@ const fetchUserProfile = async (token: string): Promise<any> => {
 };
 
 export default function IndexScreen() {
+  const { formatCurrency } = usePreferences();
   const { token, logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("User");
@@ -163,7 +166,7 @@ export default function IndexScreen() {
         <ThemedText>{item.description || "something"}</ThemedText>
         <ThemedText style={styles.accountName}>{item.account?.name || "Checking account"}</ThemedText>
       </View>
-      <ThemedText style={styles.transactionAmount}>-${Math.abs(item.amount / 100).toFixed(2)}</ThemedText>
+      <FormattedCurrency amount={item.amount} style={styles.transactionAmount} showSign={item.amount > 0} />
     </View>
   );
 
@@ -174,10 +177,6 @@ export default function IndexScreen() {
       </ThemedView>
     );
   }
-
-  const formattedTotalBalance = (dashboardData.totalBalance / 100).toFixed(2);
-  const spentBalance = (dashboardData.totalBalance / 100).toFixed(2);
-  const leftToAssignDisplay = (calculatedLeftToAssign / 100).toFixed(2);
 
   const weeklyChangePercent = dashboardData.summary.weeklyChangePercent;
   const isPositiveChange = weeklyChangePercent > 0;
@@ -197,12 +196,12 @@ export default function IndexScreen() {
       <View style={styles.balanceCard}>
         <View style={styles.balanceRow}>
           <ThemedText style={styles.balanceLabel}>Spent</ThemedText>
-          <ThemedText style={styles.balanceValue}>${spentBalance}</ThemedText>
+          <FormattedCurrency amount={dashboardData.totalBalance} style={styles.balanceValue} showSign={false} />
         </View>
-        <ThemedText style={styles.totalBalance}>${formattedTotalBalance}</ThemedText>
+        <FormattedCurrency amount={dashboardData.totalBalance} style={styles.totalBalance} showSign={false} />
         <View style={styles.balanceRow}>
           <ThemedText style={styles.balanceLabel}>Left to assign</ThemedText>
-          <ThemedText style={styles.balanceValue}>${leftToAssignDisplay}</ThemedText>
+          <FormattedCurrency amount={calculatedLeftToAssign} style={styles.balanceValue} showSign={false} />
         </View>
       </View>
       <TouchableOpacity onPress={navToAssign} style={styles.assignButton}>

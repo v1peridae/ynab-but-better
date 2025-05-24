@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { API_URL } from "@/constants/apiurl";
+import { usePreferences } from "@/context/PreferencesContext";
 
 interface UserPreferences {
   currency: string;
@@ -29,6 +30,8 @@ const DATE_FORMATS = [
   { id: "MM/DD/YYYY", name: "MM/DD/YYYY (12/31/2023)" },
   { id: "DD/MM/YYYY", name: "DD/MM/YYYY (31/12/2023)" },
   { id: "YYYY-MM-DD", name: "YYYY-MM-DD (2023-12-31)" },
+  { id: "DD-MM-YYYY", name: "DD-MM-YYYY (31-12-2023)" },
+  { id: "MM-DD-YYYY", name: "MM-DD-YYYY (12-31-2023)" },
 ];
 
 const THEMES = [
@@ -39,72 +42,14 @@ const THEMES = [
 
 export default function SettingsScreen() {
   const { token } = useAuth();
+  const { preferences, updatePreference, loading } = usePreferences();
   const backgroundColor = useThemeColor({ light: "#f8f9fa", dark: "#1c1c1e" }, "background");
   const tintColor = useThemeColor({}, "tint");
-
-  const [preferences, setPreferences] = useState<UserPreferences>({
-    currency: "USD",
-    dateFormat: "MM/DD/YYYY",
-    theme: "auto",
-    notifications: true,
-  });
-
-  const [loading, setLoading] = useState(true);
 
   // Modal states
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [showDateFormatPicker, setShowDateFormatPicker] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
-
-  const fetchUserPreferences = useCallback(async () => {
-    if (!token) return;
-
-    try {
-      const response = await fetch(`${API_URL}/user/profile`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const userData = await response.json();
-        if (userData.preferences) {
-          setPreferences({ ...preferences, ...userData.preferences });
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching preferences:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, preferences]);
-
-  useEffect(() => {
-    fetchUserPreferences();
-  }, [fetchUserPreferences]);
-
-  const updatePreference = async (key: keyof UserPreferences, value: any) => {
-    const updatedPreferences = { ...preferences, [key]: value };
-    setPreferences(updatedPreferences);
-
-    try {
-      const response = await fetch(`${API_URL}/user/preferences`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ [key]: value }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update preferences");
-      }
-    } catch (error) {
-      console.error("Error updating preferences:", error);
-      setPreferences(preferences);
-    }
-  };
 
   const SettingsSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <View style={styles.section}>

@@ -7,10 +7,22 @@ import { useAuth } from "@/context/AuthContext";
 import { API_URL } from "@/constants/apiurl";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { usePreferences } from "@/context/PreferencesContext";
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  CAD: "C$",
+  AUD: "A$",
+  JPY: "¥",
+  INR: "₹",
+};
 
 export default function AddAccountScreen() {
   const backgroundColor = useThemeColor({ light: "#f8f9fa", dark: "#1c1c1e" }, "background");
   const { token } = useAuth();
+  const { preferences } = usePreferences();
 
   const [name, setName] = useState("");
   const [type, setType] = useState("checking");
@@ -104,7 +116,7 @@ export default function AddAccountScreen() {
         <View style={styles.inputGroup}>
           <ThemedText style={styles.label}>Initial Balance</ThemedText>
           <View style={[styles.balanceInput, { backgroundColor }]}>
-            <ThemedText style={styles.currencySymbol}>$</ThemedText>
+            <ThemedText style={styles.currencySymbol}>{CURRENCY_SYMBOLS[preferences.currency] || "$"}</ThemedText>
             <TextInput
               style={styles.balanceTextInput}
               placeholder="0.00"

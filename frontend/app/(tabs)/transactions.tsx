@@ -3,9 +3,12 @@ import { View, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, Alert, 
 import { Picker } from "@react-native-picker/picker";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
+import { SwipeableTransaction } from "@/components/SwipeableTransaction";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useAuth } from "@/context/AuthContext";
 import { API_URL } from "@/constants/apiurl";
+import { usePreferences } from "@/context/PreferencesContext";
+import { FormattedCurrency } from "@/components/FormattedCurrency";
 
 interface Transaction {
   id: string;
@@ -46,6 +49,7 @@ export default function TransactionsScreen() {
   const [accounts, setAccounts] = useState([]);
   const textColor = useThemeColor({}, "text");
   const tintColor = useThemeColor({}, "tint");
+  const { formatCurrency } = usePreferences();
 
   const loadTransactions = useCallback(async () => {
     if (token) {
@@ -85,6 +89,24 @@ export default function TransactionsScreen() {
     fetchAccounts();
     loadTransactions();
   }, [fetchAccounts, loadTransactions]);
+
+  const handleDeleteTransaction = async (transactionId: string) => {
+    try {
+      const response = await fetch(`${API_URL}/transactions/${transactionId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to delete transaction");
+      }
+      setTransactions((prev) => prev.filter((t) => t.id !== transactionId));
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
+      Alert.alert("Error", "Failed to delete transaction");
+    }
+  };
 
   const handleAddTransaction = async () => {
     if (!description || !amount) {
@@ -127,16 +149,16 @@ export default function TransactionsScreen() {
 
   const renderTransaction = ({ item }: { item: Transaction }) => {
     const isPositive = item.amount > 0;
-    const formattedAmount = `${isPositive ? "+" : "-"}$${Math.abs(item.amount / 100).toFixed(2)}`;
-
     return (
-      <View style={styles.transactionItem}>
-        <View>
-          <ThemedText>{item.description}</ThemedText>
-          <ThemedText style={styles.accountName}>{item.account?.name}</ThemedText>
+      <SwipeableTransaction transactionId={item.id} description={item.description} onDelete={() => handleDeleteTransaction(item.id)}>
+        <View style={styles.transactionItem}>
+          <View>
+            <ThemedText>{item.description}</ThemedText>
+            <ThemedText style={styles.accountName}>{item.account?.name}</ThemedText>
+          </View>
+          <FormattedCurrency amount={item.amount} style={[styles.amount, { color: isPositive ? "#4CAF50" : "#F44336" }]} showSign={true} />
         </View>
-        <ThemedText style={[styles.amount, { color: isPositive ? "#4CAF50" : "#F44336" }]}>{formattedAmount}</ThemedText>
-      </View>
+      </SwipeableTransaction>
     );
   };
 

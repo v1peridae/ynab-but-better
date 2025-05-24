@@ -6,6 +6,8 @@ import { useAuth } from "@/context/AuthContext";
 import { API_URL } from "@/constants/apiurl";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { usePreferences } from "@/context/PreferencesContext";
+import { FormattedCurrency } from "@/components/FormattedCurrency";
 
 type Account = {
   id: string;
@@ -71,7 +73,7 @@ export default function AccountsScreen() {
         <ThemedText style={styles.accountName}>{item.name}</ThemedText>
         <ThemedText style={styles.accountType}>{item.type ? item.type.charAt(0).toUpperCase() + item.type.slice(1) : "Unknown"}</ThemedText>
       </View>
-      <ThemedText style={styles.accountBalance}>${(item.balance / 100).toFixed(2)}</ThemedText>
+      <FormattedCurrency amount={item.balance} style={styles.accountBalance} showSign={false} />
     </View>
   );
 

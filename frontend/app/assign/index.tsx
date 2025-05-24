@@ -5,6 +5,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useAuth } from "@/context/AuthContext";
 import { API_URL } from "@/constants/apiurl";
 import { router } from "expo-router";
+import { FormattedCurrency } from "@/components/FormattedCurrency";
 
 interface CategoryResponse {
   id: number;
@@ -163,7 +164,7 @@ export default function AssignScreen() {
     const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
 
     if (newTotalBudgeted > totalAccountBalances) {
-      alert(`Total budgeted amount cannot exceed total available funds in accounts ($${totalAccountBalances.toFixed(2)}).`);
+      alert(`Total budgeted amount cannot exceed total available funds in accounts.`);
       return;
     }
 
@@ -216,7 +217,7 @@ export default function AssignScreen() {
           </View>
           <View style={styles.amountContainer}>
             <ThemedText style={styles.amountLabel}>Available</ThemedText>
-            <ThemedText style={styles.amountValue}>${budgetItem.available.toFixed(2)}</ThemedText>
+            <FormattedCurrency amount={budgetItem.available * 100} style={styles.amountValue} showSign={false} />
           </View>
         </View>
       </View>
@@ -252,7 +253,7 @@ export default function AssignScreen() {
                   onPress={() => setSelectedAccount(item)}
                 >
                   <ThemedText style={styles.accountName}>{item.name}</ThemedText>
-                  <ThemedText style={styles.accountBalance}>${item.balance.toFixed(2)}</ThemedText>
+                  <FormattedCurrency amount={item.balance} style={styles.accountBalance} showSign={false} />
                 </TouchableOpacity>
               )}
               keyExtractor={(item) => item.id.toString()}
@@ -266,7 +267,7 @@ export default function AssignScreen() {
 
       <View style={styles.unassignedContainer}>
         <ThemedText style={styles.unassignedLabel}>Unassigned</ThemedText>
-        <ThemedText style={styles.unassignedAmount}>${unassignedAmount.toFixed(2)}</ThemedText>
+        <FormattedCurrency amount={unassignedAmount} style={styles.unassignedAmount} showSign={false} />
       </View>
 
       <FlatList
