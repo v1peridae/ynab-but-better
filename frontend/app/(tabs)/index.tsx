@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from "react-native";
+import { View, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, ScrollView } from "react-native";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useAuth } from "@/context/AuthContext";
@@ -35,14 +35,11 @@ const fetchDashboardData = async (token: string): Promise<any> => {
     console.error("Error fetching dashboard data:", error);
     return {
       totalBalance: 0,
+      totalSpent: 0,
       accounts: [],
       recentTransactions: [],
       unassigned: 0,
-      summary: {
-        topPurchase: "Unknown",
-        topCategory: "Unknown",
-        weeklyChangePercent: 0,
-      },
+      summary: { topPurchase: "Unknown", topCategory: "Unknown", weeklyChangePercent: 0 },
     };
   }
 };
@@ -71,14 +68,11 @@ export default function IndexScreen() {
   const [userName, setUserName] = useState("User");
   const [dashboardData, setDashboardData] = useState({
     totalBalance: 0,
+    totalSpent: 0,
     accounts: [],
     recentTransactions: [],
     unassigned: 0,
-    summary: {
-      topPurchase: "Unknown",
-      topCategory: "Unknown",
-      weeklyChangePercent: 0,
-    },
+    summary: { topPurchase: "Unknown", topCategory: "Unknown", weeklyChangePercent: 0 },
   });
   const [calculatedLeftToAssign, setCalculatedLeftToAssign] = useState(0);
 
@@ -98,6 +92,7 @@ export default function IndexScreen() {
 
           let apiDashboardData = {
             totalBalance: 0,
+            totalSpent: 0,
             accounts: [],
             recentTransactions: [],
             unassigned: 0,
@@ -105,6 +100,7 @@ export default function IndexScreen() {
           };
           if (dashboardApiResponse.ok) {
             apiDashboardData = await dashboardApiResponse.json();
+            console.log("Dashboard API data:", apiDashboardData);
           } else {
             console.error("Failed to fetch dashboard data from API");
           }
@@ -128,13 +124,14 @@ export default function IndexScreen() {
           } else {
             console.error(`Budget data fetch for month ${month} failed with status: ${budgetMonthResponse.status}`);
           }
-
           const totalBalanceInCents = apiDashboardData.totalBalance || 0;
+          const totalSpentInCents = apiDashboardData.totalSpent || 0;
           setCalculatedLeftToAssign(totalBalanceInCents - currentMonthBudgetedInCents);
         } catch (error) {
           console.error("Error fetching data in IndexScreen:", error);
           setDashboardData({
             totalBalance: 0,
+            totalSpent: 0,
             accounts: [],
             recentTransactions: [],
             unassigned: 0,
@@ -149,6 +146,7 @@ export default function IndexScreen() {
         setLoading(false);
         setDashboardData({
           totalBalance: 0,
+          totalSpent: 0,
           accounts: [],
           recentTransactions: [],
           unassigned: 0,
@@ -184,74 +182,80 @@ export default function IndexScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <ThemedText style={styles.welcomeText}>Welcome back, {userName}</ThemedText>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <View>
+            <ThemedText style={styles.welcomeText}>Welcome back, {userName}</ThemedText>
+          </View>
+          <TouchableOpacity onPress={logout} style={styles.settingsButton}>
+            <Ionicons name="log-out-outline" size={24} color="#fff" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={logout} style={styles.settingsButton}>
-          <Ionicons name="log-out-outline" size={24} color="#fff" />
+
+        <View style={styles.balanceCard}>
+          <View style={styles.balanceRow}>
+            <ThemedText style={styles.spentLabel}>Spent</ThemedText>
+            <FormattedCurrency amount={dashboardData.totalSpent} style={styles.totalBalance} showSign={false} />
+          </View>
+          <View style={styles.balanceRow}>
+            <ThemedText style={styles.balanceLabel}>Left to assign</ThemedText>
+            <FormattedCurrency amount={calculatedLeftToAssign} style={styles.balanceValue} showSign={false} />
+          </View>
+          <View style={styles.balanceRow}>
+            <ThemedText style={styles.balanceLabel}>Total remaining</ThemedText>
+            <FormattedCurrency amount={dashboardData.totalBalance} style={styles.balanceValue} showSign={false} />
+          </View>
+        </View>
+        <TouchableOpacity onPress={navToAssign} style={styles.assignButton}>
+          <ThemedText style={styles.assignButtonText}>Assign</ThemedText>
         </TouchableOpacity>
-      </View>
 
-      <View style={styles.balanceCard}>
-        <View style={styles.balanceRow}>
-          <ThemedText style={styles.balanceLabel}>Spent</ThemedText>
-          <FormattedCurrency amount={dashboardData.totalBalance} style={styles.balanceValue} showSign={false} />
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Spending</ThemedText>
+          <View style={styles.divider} />
+          <FlatList
+            data={dashboardData.recentTransactions?.slice(0, 3) || []}
+            renderItem={renderTransactionItem}
+            keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+            scrollEnabled={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <ThemedText style={styles.emptyText}>No recent transactions</ThemedText>
+              </View>
+            }
+          />
         </View>
-        <FormattedCurrency amount={dashboardData.totalBalance} style={styles.totalBalance} showSign={false} />
-        <View style={styles.balanceRow}>
-          <ThemedText style={styles.balanceLabel}>Left to assign</ThemedText>
-          <FormattedCurrency amount={calculatedLeftToAssign} style={styles.balanceValue} showSign={false} />
-        </View>
-      </View>
-      <TouchableOpacity onPress={navToAssign} style={styles.assignButton}>
-        <ThemedText style={styles.assignButtonText}>Assign</ThemedText>
-      </TouchableOpacity>
-
-      <View style={styles.section}>
-        <ThemedText style={styles.sectionTitle}>Spending</ThemedText>
-        <View style={styles.divider} />
-        <FlatList
-          data={dashboardData.recentTransactions?.slice(0, 3) || []}
-          renderItem={renderTransactionItem}
-          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
-          scrollEnabled={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <ThemedText style={styles.emptyText}>No recent transactions</ThemedText>
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>This week summary</ThemedText>
+          <View style={styles.divider} />
+          <View style={styles.summaryGrid}>
+            <View style={styles.summaryGridItem}>
+              <ThemedText style={styles.summaryGridLabel}>Top purchase</ThemedText>
+              <ThemedText style={styles.summaryGridValue}>{dashboardData.summary?.topPurchase}</ThemedText>
             </View>
-          }
-        />
-      </View>
-      <View style={styles.section}>
-        <ThemedText style={styles.sectionTitle}>This week summary</ThemedText>
-        <View style={styles.divider} />
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryGridItem}>
-            <ThemedText style={styles.summaryGridLabel}>Top purchase</ThemedText>
-            <ThemedText style={styles.summaryGridValue}>{dashboardData.summary?.topPurchase || "Cat food"}</ThemedText>
-          </View>
-          <View style={styles.summaryGridItem}>
-            <ThemedText style={styles.summaryGridLabel}>Top category</ThemedText>
-            <ThemedText style={styles.summaryGridValue}>{dashboardData.summary?.topCategory || "Entertainment"}</ThemedText>
-          </View>
-          <View style={styles.summaryGridItem}>
-            <ThemedText style={styles.summaryGridLabel}>Weekly change</ThemedText>
-            <View style={styles.changeIndicator}>
-              <Ionicons name={isPositiveChange ? "arrow-up" : "arrow-down"} size={14} color={isPositiveChange ? "green" : "red"} />
-              <ThemedText style={styles.summaryGridValue}>{weeklyChangeFormatted}</ThemedText>
+            <View style={styles.summaryGridItem}>
+              <ThemedText style={styles.summaryGridLabel}>Top category</ThemedText>
+              <ThemedText style={styles.summaryGridValue}>{dashboardData.summary?.topCategory}</ThemedText>
+            </View>
+            <View style={styles.summaryGridItem}>
+              <ThemedText style={styles.summaryGridLabel}>Weekly change</ThemedText>
+              <View style={styles.changeIndicator}>
+                <Ionicons name={isPositiveChange ? "arrow-up" : "arrow-down"} size={14} color={isPositiveChange ? "green" : "red"} />
+                <ThemedText style={styles.summaryGridValue}>{weeklyChangeFormatted}</ThemedText>
+              </View>
             </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
+  container: { flex: 1, paddingTop: 60 },
+  scrollView: { flex: 1, paddingHorizontal: 20 },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, marginTop: 20 },
   welcomeText: { fontSize: 24, fontWeight: "normal" },
   emptyList: { alignItems: "center", paddingVertical: 10 },
   changeIndicator: { flexDirection: "row", alignItems: "center" },
@@ -264,6 +268,7 @@ const styles = StyleSheet.create({
   balanceLabel: { fontSize: 16 },
   balanceValue: { fontSize: 14, fontWeight: "bold" },
   totalBalance: { fontSize: 24, fontWeight: "bold", textAlign: "right", marginVertical: 4 },
+  totalBalanceLabel: { fontSize: 16, marginBottom: 8, color: "#666666" },
   section: { backgroundColor: "#000000", borderRadius: 8, padding: 16, marginBottom: 16 },
   sectionTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 8 },
   divider: { height: 1, backgroundColor: "#333333", marginBottom: 10 },
@@ -285,4 +290,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   assignButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  spentLabel: { fontSize: 18, fontWeight: "bold", marginBottom: 4, color: "#fff" },
 });

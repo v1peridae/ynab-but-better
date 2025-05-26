@@ -79,9 +79,9 @@ model BudgetMonth {
 
 model BudgetItems {
   id            Int         @id @default(autoincrement())
-  amount        Int
+  goal          Int
   spent         Int         @default(0)
-  available     Int         @default(0)
+  remaining     Int         @default(0)
   category      Category    @relation(fields: [categoryId], references: [id])
   categoryId    Int
   budgetMonth   BudgetMonth @relation(fields: [budgetMonthId], references: [id])

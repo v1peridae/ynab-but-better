@@ -45,17 +45,22 @@ router.post("/signup", [body("email").isEmail().withMessage("Invalid email"), bo
             { name: "Dining Out", group: "Fun" },
           ],
         },
-        budgetMonths: {
-          create: {
-            month: new Date().toISOString().slice(0, 7),
-            items: {
-              create: [
-                { categoryId: 1, amount: 0 },
-                { categoryId: 2, amount: 0 },
-                { categoryId: 3, amount: 0 },
-              ],
-            },
-          },
+      },
+    });
+
+    const categories = await prisma.category.findMany({
+      where: { userId: user.id },
+    });
+
+    await prisma.budgetMonth.create({
+      data: {
+        month: new Date().toISOString().slice(0, 7),
+        userId: user.id,
+        items: {
+          create: categories.map((category) => ({
+            categoryId: category.id,
+            goal: 0,
+          })),
         },
       },
     });

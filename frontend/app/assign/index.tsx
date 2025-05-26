@@ -1,5 +1,14 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { View, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from "react-native";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useAuth } from "@/context/AuthContext";
@@ -47,10 +56,22 @@ export default function AssignScreen() {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [budgetItems, setBudgetItems] = useState<Record<number, BudgetItem>>({});
-  const [unassignedAmount, setUnassignedAmount] = useState(0);
+  const [unspentAmount, setUnspentAmount] = useState(0);
   const [currentMonth, setCurrentMonth] = useState("");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
+
+  if (loading) {
+    return (
+      <ThemedView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+      </ThemedView>
+    );
+  }
 
   const fetchAccounts = useCallback(async () => {
     try {
@@ -141,30 +162,29 @@ export default function AssignScreen() {
   useEffect(() => {
     if (accounts.length > 0 || Object.keys(budgetItems).length > 0) {
       const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
-      const totalBudgeted = Object.values(budgetItems).reduce((sum, item) => sum + (item.amount || 0), 0);
-      setUnassignedAmount(totalAccountBalances - totalBudgeted);
+      const totalSpent = Object.values(budgetItems).reduce((sum, item) => sum + (item.spent || 0), 0);
+      setUnspentAmount(totalAccountBalances - totalSpent);
     } else {
       const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
-      setUnassignedAmount(totalAccountBalances);
+      setUnspentAmount(totalAccountBalances);
     }
   }, [accounts, budgetItems]);
 
   const updateBudgetItem = async (categoryId: number, amount: string) => {
     const numAmount = parseFloat(amount) || 0;
 
-    const newBudgetItems = {
-      ...budgetItems,
-      [categoryId]: {
-        ...(budgetItems[categoryId] || { spent: 0, available: 0 }),
-        amount: numAmount,
-        available: numAmount - (budgetItems[categoryId]?.spent || 0),
-      },
-    };
-    const newTotalBudgeted = Object.values(newBudgetItems).reduce((sum, item) => sum + (item.amount || 0), 0);
-    const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
+    const currentGoals = Object.entries(budgetItems)
+      .filter(([id]) => Number(id) !== categoryId)
+      .reduce((sum, [, item]) => sum + (item.amount || 0), 0);
 
-    if (newTotalBudgeted > totalAccountBalances) {
-      alert(`Total budgeted amount cannot exceed total available funds in accounts.`);
+    const totalAccountBalances = accounts.reduce((sum, account) => sum + (account.balance || 0), 0);
+    const totalSpent = Object.values(budgetItems).reduce((sum, item) => sum + (item.spent || 0), 0);
+    const unspentCash = totalAccountBalances - totalSpent;
+
+    if (currentGoals + numAmount > unspentCash) {
+      alert(
+        `Cannot assign more than unspent cash ($${unspentCash.toFixed(2)}). Total goals would be $${(currentGoals + numAmount).toFixed(2)}.`
+      );
       return;
     }
 
@@ -198,6 +218,8 @@ export default function AssignScreen() {
 
   const renderCategoryItem = ({ item }: { item: Category }) => {
     const budgetItem = budgetItems[item.id] || { amount: 0, spent: 0, available: 0 };
+    const isOverspent = budgetItem.available < 0;
+
     return (
       <View style={styles.categoryItem}>
         <View style={styles.categoryInfo}>
@@ -206,7 +228,7 @@ export default function AssignScreen() {
         </View>
         <View style={styles.budgetInfo}>
           <View style={styles.amountContainer}>
-            <ThemedText style={styles.amountLabel}>Budgeted</ThemedText>
+            <ThemedText style={styles.amountLabel}>Goal</ThemedText>
             <TextInput
               style={styles.amountInput}
               value={budgetItem.amount.toString()}
@@ -216,13 +238,18 @@ export default function AssignScreen() {
             />
           </View>
           <View style={styles.amountContainer}>
-            <ThemedText style={styles.amountLabel}>Available</ThemedText>
-            <FormattedCurrency amount={budgetItem.available * 100} style={styles.amountValue} showSign={false} />
+            <ThemedText style={styles.amountLabel}>{isOverspent ? "Over by" : "Remaining"}</ThemedText>
+            <FormattedCurrency
+              amount={Math.abs(budgetItem.available) * 100}
+              style={[styles.amountValue, isOverspent && styles.overspentAmount]}
+              showSign={false}
+            />
           </View>
         </View>
       </View>
     );
   };
+
   if (loading) {
     return (
       <ThemedView style={styles.loadingContainer}>
@@ -230,54 +257,57 @@ export default function AssignScreen() {
       </ThemedView>
     );
   }
+
   return (
-    <ThemedView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <ThemedText style={styles.backButton}>Back</ThemedText>
-        </TouchableOpacity>
-
-        <ThemedText style={styles.headerText}>Assign Budget</ThemedText>
-      </View>
-
-      <View style={styles.accountSelector}>
-        <ThemedText style={styles.accountLabel}>Assign from account:</ThemedText>
-        <View style={styles.accountDropdown}>
-          {accounts.length > 0 ? (
-            <FlatList
-              horizontal
-              data={accounts}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.accountItem, selectedAccount?.id === item.id && styles.selectedAccountItem]}
-                  onPress={() => setSelectedAccount(item)}
-                >
-                  <ThemedText style={styles.accountName}>{item.name}</ThemedText>
-                  <FormattedCurrency amount={item.balance} style={styles.accountBalance} showSign={false} />
-                </TouchableOpacity>
-              )}
-              keyExtractor={(item) => item.id.toString()}
-              showsHorizontalScrollIndicator={false}
-            />
-          ) : (
-            <ThemedText style={styles.noAccountsText}>No accounts found</ThemedText>
-          )}
+    <TouchableWithoutFeedback onPress={dismissKeyboard}>
+      <ThemedView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <ThemedText style={styles.backButton}>Back</ThemedText>
+          </TouchableOpacity>
+          <ThemedText style={styles.headerText}>Set Spending Goals</ThemedText>
         </View>
-      </View>
 
-      <View style={styles.unassignedContainer}>
-        <ThemedText style={styles.unassignedLabel}>Unassigned</ThemedText>
-        <FormattedCurrency amount={unassignedAmount} style={styles.unassignedAmount} showSign={false} />
-      </View>
+        <View style={styles.accountSelector}>
+          <ThemedText style={styles.accountLabel}>Your accounts:</ThemedText>
+          <View style={styles.accountDropdown}>
+            {accounts.length > 0 ? (
+              <FlatList
+                horizontal
+                data={accounts}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[styles.accountItem, selectedAccount?.id === item.id && styles.selectedAccountItem]}
+                    onPress={() => setSelectedAccount(item)}
+                  >
+                    <ThemedText style={styles.accountName}>{item.name}</ThemedText>
+                    <FormattedCurrency amount={item.balance} style={styles.accountBalance} showSign={false} />
+                  </TouchableOpacity>
+                )}
+                keyExtractor={(item) => item.id.toString()}
+                showsHorizontalScrollIndicator={false}
+              />
+            ) : (
+              <ThemedText style={styles.noAccountsText}>No accounts found</ThemedText>
+            )}
+          </View>
+        </View>
 
-      <FlatList
-        data={categories}
-        renderItem={renderCategoryItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.list}
-        ListFooterComponent={<ThemedText style={styles.emptyText}>No categories found. Create some categories first.</ThemedText>}
-      />
-    </ThemedView>
+        <View style={styles.unassignedContainer}>
+          <ThemedText style={styles.unassignedLabel}>Unassigned</ThemedText>
+          <FormattedCurrency amount={unspentAmount} style={styles.unassignedAmount} showSign={false} />
+        </View>
+
+        <FlatList
+          data={categories}
+          renderItem={renderCategoryItem}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+          ListFooterComponent={<ThemedText style={styles.emptyText}>No categories found. Create some categories first.</ThemedText>}
+        />
+      </ThemedView>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -326,4 +356,5 @@ const styles = StyleSheet.create({
   accountName: { fontWeight: "bold", marginBottom: 4 },
   accountBalance: { fontSize: 14 },
   noAccountsText: { fontStyle: "italic", color: "#666" },
+  overspentAmount: { color: "#ff6b6b" },
 });

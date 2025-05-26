@@ -227,16 +227,31 @@ app.get("/user/dashboard", verifyAuth, async (req, res) => {
   const accounts = await prisma.account.findMany({ where: { userId: req.user.userId } });
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
 
-  // 2️⃣  How much of that cash have I already assigned this month?
   const month = new Date().toISOString().slice(0, 7);
+  const startOfMonth = new Date(`${month}-01`);
+  const endOfMonth = new Date(startOfMonth);
+  endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+
+  const monthlyExpenses = await prisma.transaction.findMany({
+    where: {
+      userId: req.user.userId,
+      date: {
+        gte: startOfMonth,
+        lt: endOfMonth,
+      },
+      amount: { lt: 0 },
+    },
+  });
+
+  const totalSpent = Math.abs(monthlyExpenses.reduce((sum, t) => sum + t.amount, 0));
+
   const budgetMonth = await prisma.budgetMonth.findFirst({
     where: { userId: req.user.userId, month },
-    include: { items: { select: { amount: true } } },
+    include: { items: { select: { goal: true, spent: true } } },
   });
-  const totalBudgeted = budgetMonth ? budgetMonth.items.reduce((sum, i) => sum + i.amount, 0) : 0;
+  const totalBudgeted = budgetMonth ? budgetMonth.items.reduce((sum, i) => sum + i.goal, 0) : 0;
 
-  // 3️⃣  READY-TO-ASSIGN number
-  const unassigned = totalBalance - totalBudgeted;
+  const unassigned = totalBalance - totalSpent;
 
   try {
     const recentTransactions = await prisma.transaction.findMany({
@@ -304,6 +319,7 @@ app.get("/user/dashboard", verifyAuth, async (req, res) => {
     res.json({
       accounts,
       totalBalance,
+      totalSpent,
       unassigned,
       recentTransactions,
       summary: {
@@ -416,17 +432,28 @@ app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
   const month = req.params.month;
   const categoryId = Number(req.params.id);
 
+  const accounts = await prisma.account.findMany({ where: { userId: req.user.userId } });
+  const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
+  const startOfMonth = new Date(`${month}-01`);
+  const endOfMonth = new Date(startOfMonth);
+  endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+  const monthlyExpenses = await prisma.transaction.findMany({
+    where: {
+      userId: req.user.userId,
+      date: { gte: startOfMonth, lt: endOfMonth },
+      amount: { lt: 0 },
+    },
+  });
+
+  const totalSpent = Math.abs(monthlyExpenses.reduce((sum, t) => sum + t.amount, 0));
+  const unspentCash = totalBalance - totalSpent;
   const [
     {
-      _sum: { balance = 0 },
-    },
-    {
-      _sum: { amount: already = 0 },
+      _sum: { goal: alreadyAssigned = 0 },
     },
   ] = await Promise.all([
-    prisma.account.aggregate({ _sum: { balance: true }, where: { userId: req.user.userId } }),
     prisma.budgetItems.aggregate({
-      _sum: { amount: true },
+      _sum: { goal: true },
       where: {
         budgetMonth: { month, userId: req.user.userId },
         NOT: { categoryId },
@@ -434,7 +461,13 @@ app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
     }),
   ]);
 
-  if (already + amount > balance) return res.status(400).json({ error: "Cannot budget more than available cash" });
+  if (alreadyAssigned + amount > unspentCash) {
+    return res.status(400).json({
+      error: `Cannot assign more than unspent cash. Available: $${unspentCash / 100}, Trying to assign: $${
+        (alreadyAssigned + amount) / 100
+      }`,
+    });
+  }
 
   let budgetMonth = await prisma.budgetMonth.findFirst({
     where: {
@@ -481,6 +514,29 @@ app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
     },
   });
   res.status(201).json(item);
+});
+
+app.delete("/budget/reset", verifyAuth, async (req, res) => {
+  try {
+    const month = new Date().toISOString().slice(0, 7);
+    const budgetMonth = await prisma.budgetMonth.findFirst({
+      where: { userId: req.user.userId, month },
+    });
+
+    if (budgetMonth) {
+      await prisma.budgetItems.deleteMany({
+        where: { budgetMonthId: budgetMonth.id },
+      });
+      await prisma.budgetMonth.delete({
+        where: { id: budgetMonth.id },
+      });
+    }
+
+    res.json({ message: "Budget data reset for current month" });
+  } catch (error) {
+    console.error("Error resetting budget:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 app.post("/budget/:month/rollover", verifyAuth, async (req, res) => {
