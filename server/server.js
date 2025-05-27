@@ -1,3 +1,4 @@
+//part of this is clearly vibecoded because i couldnt figure out how to do it myself please dont jump me yall :sob:
 const express = require("express");
 const app = express();
 require("dotenv").config();

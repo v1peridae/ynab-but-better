@@ -1,3 +1,5 @@
+//part of this too is vibecoded because the logic was making me crash out </3
+
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, ActivityIndicator, Switch, Modal } from "react-native";
 import { Picker } from "@react-native-picker/picker";
