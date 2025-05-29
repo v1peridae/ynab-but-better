@@ -298,6 +298,35 @@ export default function AssignScreen() {
           <FormattedCurrency amount={unspentAmount} style={styles.unassignedAmount} showSign={false} />
         </View>
 
+        <View style={styles.goalsSection}>
+          <View style={styles.goalsSectionHeader}>
+            <ThemedText style={styles.goalsSectionTitle}>Quick Goal Assignment</ThemedText>
+            <TouchableOpacity onPress={() => router.push("/goals")}>
+              <ThemedText style={styles.viewAllGoalsText}>View All</ThemedText>
+            </TouchableOpacity>
+          </View>
+
+          {goals.length > 0 ? (
+            <FlatList
+              horizontal
+              data={goals.slice(0, 3)}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.goalQuickCard} onPress={() => handleQuickGoalAssignment(item)}>
+                  <ThemedText style={styles.goalQuickLabel}>remaining</ThemedText>
+                </TouchableOpacity>
+              )}
+              keyExtractor={(item) => item.id.toString()}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.goalsHorizontalList}
+            />
+          ) : (
+            <TouchableOpacity style={styles.createGoalPrompt} onPress={() => router.push("/goals/create")}>
+              <Ionicons name="flag-outline" size={24} color="#666" />
+              <ThemedText style={styles.createGoalText}>Create your first savings goal</ThemedText>
+            </TouchableOpacity>
+          )}
+        </View>
+
         <FlatList
           data={categories}
           renderItem={renderCategoryItem}
