@@ -97,7 +97,7 @@ async function applyExpenseDelta(transaction, userId, categoryId, dateIso, delta
     create: { userId, month },
   });
 
-  await transaction.budgetItems.upsert({
+  await transaction.budgetItem.upsert({
     where: { budgetMonthId_categoryId: { budgetMonthId: budgetMonth.id, categoryId } },
     update: {
       spent: { increment: abs * (deltaCents < 0 ? 1 : -1) },
@@ -106,6 +106,7 @@ async function applyExpenseDelta(transaction, userId, categoryId, dateIso, delta
     create: {
       budgetMonthId: budgetMonth.id,
       categoryId,
+      goal: 0,
       amount: 0,
       spent: deltaCents < 0 ? abs : 0,
       available: deltaCents < 0 ? -abs : 0,
@@ -227,7 +228,6 @@ app.get("/user/dashboard", verifyAuth, async (req, res) => {
   // 1️⃣  Cash on hand
   const accounts = await prisma.account.findMany({ where: { userId: req.user.userId } });
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
-
   const month = new Date().toISOString().slice(0, 7);
   const startOfMonth = new Date(`${month}-01`);
   const endOfMonth = new Date(startOfMonth);
@@ -245,15 +245,12 @@ app.get("/user/dashboard", verifyAuth, async (req, res) => {
   });
 
   const totalSpent = Math.abs(monthlyExpenses.reduce((sum, t) => sum + t.amount, 0));
-
   const budgetMonth = await prisma.budgetMonth.findFirst({
     where: { userId: req.user.userId, month },
-    include: { items: { select: { goal: true, spent: true } } },
+    include: { items: { select: { goal: true } } },
   });
   const totalBudgeted = budgetMonth ? budgetMonth.items.reduce((sum, i) => sum + i.goal, 0) : 0;
-
   const unassigned = totalBalance - totalSpent;
-
   try {
     const recentTransactions = await prisma.transaction.findMany({
       where: { userId: req.user.userId },
@@ -371,7 +368,7 @@ app.get("/budget/:month", verifyAuth, async (req, res) => {
       return res.json([]);
     }
 
-    const items = await prisma.budgetItems.findMany({
+    const items = await prisma.budgetItem.findMany({
       where: {
         budgetMonthId: budgetMonth.id,
       },
@@ -453,7 +450,7 @@ app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
       _sum: { goal: alreadyAssigned = 0 },
     },
   ] = await Promise.all([
-    prisma.budgetItems.aggregate({
+    prisma.budgetItem.aggregate({
       _sum: { goal: true },
       where: {
         budgetMonth: { month, userId: req.user.userId },
@@ -485,7 +482,7 @@ app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
     });
   }
 
-  const existingItem = await prisma.budgetItems.findUnique({
+  const existingItem = await prisma.budgetItem.findUnique({
     where: {
       budgetMonthId_categoryId: {
         budgetMonthId: budgetMonth.id,
@@ -495,7 +492,7 @@ app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
   });
 
   const spent = existingItem?.spent || 0;
-  const item = await prisma.budgetItems.upsert({
+  const item = await prisma.budgetItem.upsert({
     where: {
       budgetMonthId_categoryId: {
         budgetMonthId: budgetMonth.id,
@@ -503,12 +500,14 @@ app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
       },
     },
     update: {
+      goal: amount,
       amount: amount,
       available: amount - spent,
     },
     create: {
       budgetMonthId: budgetMonth.id,
       categoryId,
+      goal: amount,
       amount,
       spent: 0,
       available: amount,
@@ -525,7 +524,7 @@ app.delete("/budget/reset", verifyAuth, async (req, res) => {
     });
 
     if (budgetMonth) {
-      await prisma.budgetItems.deleteMany({
+      await prisma.budgetItem.deleteMany({
         where: { budgetMonthId: budgetMonth.id },
       });
       await prisma.budgetMonth.delete({
@@ -572,7 +571,7 @@ app.post("/budget/:month/rollover", verifyAuth, async (req, res) => {
   for (const item of current.items) {
     const rolloverAmount = item.available;
     if (rolloverAmount <= 0) continue;
-    await prisma.budgetItems.upsert({
+    await prisma.budgetItem.upsert({
       where: {
         budgetMonthId_categoryId: {
           budgetMonthId: next.id,
@@ -580,13 +579,16 @@ app.post("/budget/:month/rollover", verifyAuth, async (req, res) => {
         },
       },
       update: {
+        goal: { increment: 0 },
         amount: { increment: 0 },
         available: { increment: rolloverAmount },
       },
       create: {
         budgetMonthId: next.id,
+        goal: 0,
         amount: 0,
         available: rolloverAmount,
+        spent: 0,
         categoryId: item.categoryId,
       },
     });
@@ -614,7 +616,7 @@ app.delete("/categories/:id", [verifyAuth, verifyAccountOwner], async (req, res)
     const transactionsUsingCategory = await prisma.transaction.count({
       where: { categoryId },
     });
-    const budgetItemsUsingCategory = await prisma.budgetItems.count({
+    const budgetItemsUsingCategory = await prisma.budgetItem.count({
       where: { categoryId },
     });
     if (transactionsUsingCategory > 0 || budgetItemsUsingCategory > 0) {
@@ -628,6 +630,7 @@ app.delete("/categories/:id", [verifyAuth, verifyAccountOwner], async (req, res)
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 app.get("/goals", verifyAuth, async (req, res) => {
   const goals = await prisma.goal.findMany({
     where: { userId: req.user.userId },
@@ -638,7 +641,7 @@ app.get("/goals", verifyAuth, async (req, res) => {
 app.post("/goals", verifyAuth, async (req, res) => {
   const { name, targetAmount, dueDate } = req.body;
   const goal = await prisma.goal.create({
-    data: { name, targetAmount, dueDate: newDate ? new Date(dueDate) : null, userId: req.user.userId },
+    data: { name, targetAmount, dueDate: dueDate ? new Date(dueDate) : null, userId: req.user.userId },
   });
   res.status(201).json(goal);
 });
@@ -808,5 +811,4 @@ if (process.env.NODE_ENV !== "test") {
     console.log(`Server is running on port ${process.env.PORT}`);
   });
 }
-
 module.exports = app;

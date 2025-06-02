@@ -21,78 +21,66 @@ function auth(req, res, next) {
   }
 }
 
-router.post("/signup", [body("email").isEmail().withMessage("Invalid email"), body("password").isLength({ min: 8 })], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-  const { email, password } = req.body;
-  try {
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ error: "User already exists" });
+router.post(
+  "/signup",
+  [body("email").isEmail().withMessage("Invalid email").normalizeEmail(), body("password").isLength({ min: 8 })],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
-    const hashedPassword = await bcrypt.hash(password, 10);
+    let { email, password } = req.body;
+    email = email.trim().toLowerCase();
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        categories: {
-          create: [
-            { name: "Groceries", group: "Essentials" },
-            { name: "Transport", group: "Essentials" },
-            { name: "Dining Out", group: "Fun" },
-          ],
+    try {
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({ error: "User already exists" });
+      }
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await prisma.user.create({
+        data: {
+          email,
+          password: hashedPassword,
         },
-      },
-    });
-
-    const categories = await prisma.category.findMany({
-      where: { userId: user.id },
-    });
-
-    await prisma.budgetMonth.create({
-      data: {
-        month: new Date().toISOString().slice(0, 7),
-        userId: user.id,
-        items: {
-          create: categories.map((category) => ({
-            categoryId: category.id,
-            goal: 0,
-          })),
+      });
+      await prisma.budgetMonth.create({
+        data: {
+          month: new Date().toISOString().slice(0, 7),
+          userId: user.id,
         },
-      },
-    });
+      });
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
-    const refreshToken = uuidv4();
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
+      const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+      const refreshToken = uuidv4();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
 
-    await prisma.refreshToken.create({
-      data: {
-        token: refreshToken,
-        expiresAt: expiresAt,
+      await prisma.refreshToken.create({
+        data: {
+          token: refreshToken,
+          expiresAt: expiresAt,
+          userId: user.id,
+        },
+      });
+
+      res.status(201).json({
+        message: "Account created successfully",
         userId: user.id,
-      },
-    });
-
-    res.status(201).json({
-      message: "Account created successfully",
-      userId: user.id,
-      token,
-      refreshToken,
-      expiresAt,
-    });
-  } catch (error) {
-    console.error("Error signing up", error);
-    res.status(500).json({ error: "Internal server error" });
+        token,
+        refreshToken,
+        expiresAt,
+      });
+    } catch (error) {
+      console.error("Error signing up", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
-});
+);
 
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  let { email, password } = req.body;
+  email = email.trim().toLowerCase();
   try {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
@@ -100,7 +88,6 @@ router.post("/login", async (req, res) => {
         message: "Invalid email or password",
       });
     }
-
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
       return res.status(401).json({ message: "Invalid email or password" });

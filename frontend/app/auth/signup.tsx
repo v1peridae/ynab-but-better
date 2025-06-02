@@ -26,7 +26,9 @@ export default function SignUpScreen() {
   const { login: authLogin } = useAuth();
 
   const handleSignUp = async () => {
-    if (!email || !password || !confirmPassword) {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail || !password || !confirmPassword) {
       Alert.alert("Error", "All fields are required");
       return;
     }
@@ -38,14 +40,14 @@ export default function SignUpScreen() {
       Alert.alert("Error", "Password must be at least 8 characters long");
       return;
     }
-    if (!email.includes("@")) {
+    if (!trimmedEmail.includes("@")) {
       Alert.alert("Error", "Please enter a valid email address");
       return;
     }
 
     setLoading(true);
     try {
-      const response = await signup({ email, password });
+      const response = await signup({ email: trimmedEmail, password });
 
       if (response.token && response.refreshToken) {
         await authLogin(response.token, response.refreshToken);

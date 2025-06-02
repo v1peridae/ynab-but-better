@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, View, Text, StatusBar } from "react-native";
 import { Picker } from "@react-native-picker/picker";
+import ProgressDots from "./ProgressDots";
 
 const ACCOUNT_TYPES = [
   { id: "checking", name: "Checking Account" },
@@ -10,14 +11,32 @@ const ACCOUNT_TYPES = [
   { id: "other", name: "Other" },
 ];
 
-export default function OnboardingAccounts({ onNext, onBack }) {
-  const [accounts, setAccounts] = useState([{ type: "checking", name: "", balance: "" }]);
+interface Account {
+  type: string;
+  name: string;
+  balance: string;
+}
+
+interface AccountForNext extends Omit<Account, "balance"> {
+  balance: number;
+}
+
+interface OnboardingAccountsProps {
+  onNext: (data: { accounts: AccountForNext[] }) => void;
+  onBack: () => void;
+  currentStep: number;
+  totalSteps: number;
+  onStepPress: (step: number) => void;
+}
+
+export default function OnboardingAccounts({ onNext, onBack, currentStep, totalSteps, onStepPress }: OnboardingAccountsProps) {
+  const [accounts, setAccounts] = useState<Account[]>([{ type: "checking", name: "", balance: "" }]);
 
   const addAccount = () => {
     setAccounts([...accounts, { type: "other", name: "", balance: "" }]);
   };
 
-  const updateAccount = (index, field, value) => {
+  const updateAccount = (index: number, field: keyof Account, value: string) => {
     const updatedAccounts = [...accounts];
     updatedAccounts[index] = { ...updatedAccounts[index], [field]: value };
     setAccounts(updatedAccounts);
@@ -48,20 +67,12 @@ export default function OnboardingAccounts({ onNext, onBack }) {
         </View>
 
         <View style={styles.progressContainer}>
-          <View style={styles.progressDots}>
-            <View style={styles.dot} />
-            <View style={styles.progressLine} />
-            <View style={[styles.dot, styles.activeDot]} />
-            <View style={styles.progressLine} />
-            <View style={styles.dot} />
-            <View style={styles.progressLine} />
-            <View style={styles.dot} />
-          </View>
-          <Text style={styles.stepText}>Step 2 of 4</Text>
+          <ProgressDots totalSteps={totalSteps} currentStep={currentStep} onStepPress={onStepPress} />
+          <Text style={styles.stepText}>{`Step ${currentStep} of ${totalSteps}`}</Text>
         </View>
         <View style={styles.content}>
           <Text style={styles.question}>Add Your Accounts</Text>
-          <Text style={styles.description}>Add the accounts you'd like to track on Sense</Text>
+          <Text style={styles.description}>Add the accounts you&apos;d like to track on Sense</Text>
 
           {accounts.map((account, index) => (
             <View key={index} style={styles.accountForm}>
@@ -88,6 +99,7 @@ export default function OnboardingAccounts({ onNext, onBack }) {
                 importantForAutofill="no"
                 selectTextOnFocus={false}
                 clearTextOnFocus={false}
+                secureTextEntry={false}
               />
 
               <View style={styles.pickerContainer}>
@@ -127,10 +139,6 @@ const styles = StyleSheet.create({
   mainText: { fontSize: 72, fontWeight: "500", color: "#575F72", letterSpacing: -2, marginBottom: 8 },
   subtitle: { fontSize: 20, color: "#666", fontWeight: "400", letterSpacing: 1, marginTop: -30 },
   progressContainer: { alignItems: "center", marginBottom: 40 },
-  progressDots: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  dot: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#333" },
-  activeDot: { backgroundColor: "#666" },
-  progressLine: { width: 50, height: 2, backgroundColor: "#333" },
   stepText: { color: "#666", fontSize: 14 },
   content: { width: "100%", alignItems: "center", paddingHorizontal: 24 },
   question: { color: "#666", fontSize: 24, fontWeight: "400", textAlign: "center", marginBottom: 10 },

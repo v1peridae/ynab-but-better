@@ -23,13 +23,15 @@ export default function LoginScreen() {
   const { login: authLogin } = useAuth();
   const handleLogin = async () => {
     Keyboard.dismiss();
-    if (!email || !password) {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail || !password) {
       Alert.alert("Error", "Please enter both email and password");
       return;
     }
     setLoading(true);
     try {
-      const response = await login({ email, password });
+      const response = await login({ email: trimmedEmail, password });
       await authLogin(response.token, response.refreshToken);
     } catch (error) {
       Alert.alert("Error", error instanceof Error ? error.message : "An unexpected error occurred");
@@ -78,7 +80,7 @@ export default function LoginScreen() {
               {loading ? <ActivityIndicator color="#E5E5E5" /> : <Text style={styles.buttonText}>Continue</Text>}
             </TouchableOpacity>
             <View style={styles.footer}>
-              <Text style={styles.footerText}>Don't have an account? </Text>
+              <Text style={styles.footerText}>Don&apos;t have an account? </Text>
               <Link href="/auth/signup" disabled={loading}>
                 <Text style={styles.linkText}>Sign Up</Text>
               </Link>

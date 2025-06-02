@@ -1,7 +1,15 @@
 import React, { useState } from "react";
 import { StyleSheet, TextInput, TouchableOpacity, Alert, View, Text, StatusBar } from "react-native";
+import ProgressDots from "./ProgressDots";
 
-export default function OnboardingName({ onNext }) {
+interface OnboardingNameProps {
+  onNext: (data: { name: string }) => void;
+  currentStep: number;
+  totalSteps: number;
+  onStepPress: (step: number) => void;
+}
+
+export default function OnboardingName({ onNext, currentStep, totalSteps, onStepPress }: OnboardingNameProps) {
   const [name, setName] = useState("");
 
   const handleNext = () => {
@@ -19,16 +27,8 @@ export default function OnboardingName({ onNext }) {
         <Text style={styles.subtitle}>have control</Text>
       </View>
       <View style={styles.progressContainer}>
-        <View style={styles.progressDots}>
-          <View style={[styles.dot, styles.activeDot]} />
-          <View style={styles.progressLine} />
-          <View style={styles.dot} />
-          <View style={styles.progressLine} />
-          <View style={styles.dot} />
-          <View style={styles.progressLine} />
-          <View style={styles.dot} />
-        </View>
-        <Text style={styles.stepText}>Step 1 of 4</Text>
+        <ProgressDots totalSteps={totalSteps} currentStep={currentStep} onStepPress={onStepPress} />
+        <Text style={styles.stepText}>Step 1 of 5</Text>
       </View>
       <View style={styles.content}>
         <TextInput
