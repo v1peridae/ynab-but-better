@@ -1,8 +1,6 @@
 import React, { useState } from "react";
-import { StyleSheet, TextInput, TouchableOpacity, FlatList, Alert } from "react-native";
-import { ThemedView } from "@/components/ThemedView";
-import { ThemedText } from "@/components/ThemedText";
-import { useThemeColor } from "@/hooks/useThemeColor";
+import { StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, View, Text, StatusBar } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 
 const ACCOUNT_TYPES = [
   { id: "checking", name: "Checking Account" },
@@ -13,10 +11,7 @@ const ACCOUNT_TYPES = [
 ];
 
 export default function OnboardingAccounts({ onNext, onBack }) {
-  const [accounts, setAccounts] = useState([{ type: "checking", name: "Checking", balance: "" }]);
-
-  const textColor = useThemeColor({}, "text");
-  const tintColor = useThemeColor({}, "tint");
+  const [accounts, setAccounts] = useState([{ type: "checking", name: "", balance: "" }]);
 
   const addAccount = () => {
     setAccounts([...accounts, { type: "other", name: "", balance: "" }]);
@@ -43,82 +38,129 @@ export default function OnboardingAccounts({ onNext, onBack }) {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText style={styles.subtitle}>Add your accounts</ThemedText>
-      <ThemedText style={styles.description}>Add the accounts you want to track in this app</ThemedText>
-      <FlatList
-        data={accounts}
-        keyExtractor={(_, index) => `account-${index}`}
-        renderItem={({ item, index }) => (
-          <ThemedView style={styles.accountItem}>
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: textColor }]}
-              placeholder="Account Name"
-              value={item.name}
-              onChangeText={(value) => updateAccount(index, "name", value)}
-            />
-            <TextInput
-              style={[styles.input, { color: textColor, borderColor: textColor }]}
-              placeholder="Current Balance"
-              keyboardType="numeric"
-              value={item.balance}
-              onChangeText={(value) => updateAccount(index, "balance", value)}
-            />
-            <ThemedText style={styles.selectLabel}>Account Type</ThemedText>
-            <FlatList
-              data={ACCOUNT_TYPES}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              renderItem={({ item: type }) => (
-                <TouchableOpacity
-                  style={[styles.typeButton, { backgroundColor: type.id === accounts[index].type ? tintColor : "transparent" }]}
-                  onPress={() => updateAccount(index, "type", type.id)}
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#0D0E14" />
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.mainText}>Sense</Text>
+          <Text style={styles.subtitle}>have control</Text>
+        </View>
+
+        <View style={styles.progressContainer}>
+          <View style={styles.progressDots}>
+            <View style={styles.dot} />
+            <View style={styles.progressLine} />
+            <View style={[styles.dot, styles.activeDot]} />
+            <View style={styles.progressLine} />
+            <View style={styles.dot} />
+            <View style={styles.progressLine} />
+            <View style={styles.dot} />
+          </View>
+          <Text style={styles.stepText}>Step 2 of 4</Text>
+        </View>
+        <View style={styles.content}>
+          <Text style={styles.question}>Add Your Accounts</Text>
+          <Text style={styles.description}>Add the accounts you'd like to track on Sense</Text>
+
+          {accounts.map((account, index) => (
+            <View key={index} style={styles.accountForm}>
+              <TextInput
+                style={styles.input}
+                placeholder="Account Name"
+                placeholderTextColor="#666"
+                value={account.name}
+                onChangeText={(value) => updateAccount(index, "name", value)}
+              />
+
+              <TextInput
+                style={styles.input}
+                placeholder="Account Balance"
+                placeholderTextColor="#666"
+                keyboardType="number-pad"
+                value={account.balance}
+                onChangeText={(value) => updateAccount(index, "balance", value)}
+                textContentType="none"
+                autoComplete="off"
+                autoCorrect={false}
+                autoCapitalize="none"
+                spellCheck={false}
+                importantForAutofill="no"
+                selectTextOnFocus={false}
+                clearTextOnFocus={false}
+              />
+
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={account.type}
+                  style={styles.picker}
+                  itemStyle={styles.pickerItem}
+                  onValueChange={(value) => updateAccount(index, "type", value)}
+                  dropdownIconColor="#E5E5E5"
                 >
-                  <ThemedText style={type.id === accounts[index].type ? styles.selectedTypeText : {}}>{type.name}</ThemedText>
-                </TouchableOpacity>
-              )}
-              keyExtractor={(type) => type.id}
-            />
-          </ThemedView>
-        )}
-      />
-      <TouchableOpacity style={styles.addButton} onPress={addAccount}>
-        <ThemedText style={{ color: tintColor }}>+ Add Another Account</ThemedText>
-      </TouchableOpacity>
+                  {ACCOUNT_TYPES.map((type) => (
+                    <Picker.Item key={type.id} label={type.name} value={type.id} color="#E5E5E5" />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          ))}
 
-      <ThemedView style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <ThemedText>Back</ThemedText>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.addButton} onPress={addAccount}>
+            <Text style={styles.addButtonText}>+ Add Another Account</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.nextButton, { backgroundColor: tintColor }]} onPress={handleNext}>
-          <ThemedText style={styles.nextButtonText}>Next</ThemedText>
-        </TouchableOpacity>
-      </ThemedView>
-    </ThemedView>
+          <TouchableOpacity style={styles.continueButton} onPress={handleNext}>
+            <Text style={styles.buttonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  subtitle: { fontSize: 20, fontWeight: "bold", marginBottom: 10 },
-  description: { marginBottom: 20 },
-  accountItem: { marginBottom: 20, padding: 15, borderRadius: 10, borderWidth: 1, borderColor: "#ddd" },
-  input: { height: 40, borderWidth: 1, marginBottom: 10, paddingHorizontal: 10, borderRadius: 5 },
-  selectLabel: { marginBottom: 5 },
-  typeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#ddd",
+  container: { flex: 1, backgroundColor: "#0D0E14" },
+  scrollView: { flex: 1 },
+  scrollContent: { alignItems: "center", paddingBottom: 40 },
+  header: { alignItems: "center", marginTop: 80, marginBottom: 40 },
+  mainText: { fontSize: 72, fontWeight: "500", color: "#575F72", letterSpacing: -2, marginBottom: 8 },
+  subtitle: { fontSize: 20, color: "#666", fontWeight: "400", letterSpacing: 1, marginTop: -30 },
+  progressContainer: { alignItems: "center", marginBottom: 40 },
+  progressDots: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+  dot: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#333" },
+  activeDot: { backgroundColor: "#666" },
+  progressLine: { width: 50, height: 2, backgroundColor: "#333" },
+  stepText: { color: "#666", fontSize: 14 },
+  content: { width: "100%", alignItems: "center", paddingHorizontal: 24 },
+  question: { color: "#666", fontSize: 24, fontWeight: "400", textAlign: "center", marginBottom: 10 },
+  description: { color: "#666", fontSize: 16, textAlign: "center", marginBottom: 40, opacity: 0.8 },
+  accountForm: { width: "100%", maxWidth: 320, marginBottom: 30 },
+  input: {
+    backgroundColor: "#252933",
+    opacity: 0.5,
+    height: 50,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    color: "#E5E5E5",
+    fontSize: 16,
+    marginBottom: 15,
+    textAlign: "center",
   },
-  selectedTypeText: { color: "#fff", fontWeight: "bold" },
-  addButton: { alignItems: "center", marginVertical: 15 },
-  buttonContainer: { flexDirection: "row", justifyContent: "space-between", marginTop: "auto" },
-  backButton: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8, borderWidth: 1, borderColor: "#ddd" },
-  nextButton: { paddingVertical: 12, paddingHorizontal: 30, borderRadius: 8 },
-  nextButtonText: { color: "#fff", fontWeight: "bold" },
+  pickerContainer: { borderRadius: 18, marginBottom: 15, height: 50, overflow: "hidden" },
+  picker: { height: 50, color: "#E5E5E5", borderRadius: 18, backgroundColor: "transparent" },
+  pickerItem: { height: 50, fontSize: 16, color: "#E5E5E5" },
+  addButton: { marginBottom: 40 },
+  addButtonText: { color: "#E5E5E5", opacity: 0.5, fontSize: 16, fontWeight: "600", textAlign: "center" },
+  continueButton: {
+    backgroundColor: "#252933",
+    opacity: 0.5,
+    paddingVertical: 16,
+    borderRadius: 18,
+    alignItems: "center",
+    width: 280,
+    alignSelf: "center",
+    marginBottom: 40,
+  },
+  buttonText: { fontSize: 18, fontWeight: "600", color: "#E5E5E5" },
 });
