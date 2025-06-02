@@ -23,7 +23,7 @@ export default function OnboardingScreen() {
     },
     categories: [],
   });
-  const { token } = useAuth();
+  const { token, loading, isLoggedIn } = useAuth();
 
   const handleNext = (data: any) => {
     setUserData({ ...userData, ...data });
@@ -46,8 +46,8 @@ export default function OnboardingScreen() {
       await saveOnboardingData(userData, token);
       router.replace("/(tabs)");
     } catch (error) {
-      Alert.alert("Error", "Failed to save onboarding data. Please try again.");
       console.error("Onboarding save error:", error);
+      Alert.alert("Error", "Failed to save onboarding data. Please try again.");
     }
   };
 

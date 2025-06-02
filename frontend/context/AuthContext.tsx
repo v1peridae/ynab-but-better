@@ -4,7 +4,7 @@ import { router } from "expo-router";
 
 interface AuthContextType {
   token: string | null;
-  login: (token: string, refreshToken: string) => Promise<void>;
+  login: (token: string, refreshToken: string, redirect?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   loading: boolean;
   isLoggedIn: boolean;
@@ -40,12 +40,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loadToken();
   }, []);
 
-  const login = async (token: string, refreshToken: string) => {
+  const login = async (token: string, refreshToken: string, redirect: boolean = true) => {
     try {
       await SecureStore.setItemAsync("token", token);
       await SecureStore.setItemAsync("refreshToken", refreshToken);
       setToken(token);
-      router.replace("/(tabs)");
+      if (redirect) {
+        router.replace("/(tabs)");
+      }
     } catch (error) {
       console.error("Error logging in", error);
     }

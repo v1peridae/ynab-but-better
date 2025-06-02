@@ -50,7 +50,7 @@ export default function SignUpScreen() {
       const response = await signup({ email: trimmedEmail, password });
 
       if (response.token && response.refreshToken) {
-        await authLogin(response.token, response.refreshToken);
+        await authLogin(response.token, response.refreshToken, false);
       }
 
       router.replace("/onboarding");

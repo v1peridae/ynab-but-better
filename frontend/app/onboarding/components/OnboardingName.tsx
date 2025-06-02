@@ -7,10 +7,11 @@ interface OnboardingNameProps {
   currentStep: number;
   totalSteps: number;
   onStepPress: (step: number) => void;
+  initialData?: { name: string };
 }
 
-export default function OnboardingName({ onNext, currentStep, totalSteps, onStepPress }: OnboardingNameProps) {
-  const [name, setName] = useState("");
+export default function OnboardingName({ onNext, currentStep, totalSteps, onStepPress, initialData }: OnboardingNameProps) {
+  const [name, setName] = useState(initialData?.name || "");
 
   const handleNext = () => {
     if (!name.trim()) {
