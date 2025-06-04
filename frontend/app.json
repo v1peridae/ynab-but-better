@@ -10,7 +10,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.v1peridae.sense"
+      "bundleIdentifier": "com.v1peridae.sense",
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": []
+      }
     },
     "android": {
       "adaptiveIcon": {

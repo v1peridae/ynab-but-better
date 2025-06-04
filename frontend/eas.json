@@ -9,7 +9,9 @@
         "image": "latest"
       },
       "ios": {
-        "image": "latest"
+        "image": "latest",
+        "simulator": false,
+        "buildConfiguration": "Debug"
       },
       "developmentClient": true,
       "distribution": "internal"
