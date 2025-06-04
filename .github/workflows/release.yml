@@ -3,11 +3,11 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., v1.0.0)'
+        description: "Release version (e.g., v1.0.0)"
         required: true
 
 jobs:
@@ -15,17 +15,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: "18"
+          cache: "npm"
           cache-dependency-path: server/package-lock.json
-          
+
       - name: Install server dependencies
         run: cd server && npm ci
-        
+
       - name: Run tests
         run: cd server && npm test
 
@@ -34,20 +34,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          
+          node-version: "18"
+
       - name: Install server dependencies
         run: cd server && npm ci --only=production
-        
+
       - name: Create server archive
         run: |
           cd server
           tar -czf ../server-${{ github.ref_name }}.tar.gz --exclude=node_modules --exclude=tests .
-          
+
       - name: Upload server artifact
         uses: actions/upload-artifact@v4
         with:
@@ -59,31 +59,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          
+          node-version: "18"
+
       - name: Setup Expo
         uses: expo/expo-github-action@v8
         with:
           expo-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-          
+
       - name: Install frontend dependencies
         run: cd frontend && npm ci
-        
+
       - name: Build for production
         run: |
           cd frontend
           npx expo export --platform all
-          
+
       - name: Create mobile archive
         run: |
           cd frontend
           tar -czf ../mobile-${{ github.ref_name }}.tar.gz dist/
-          
+
       - name: Upload mobile artifact
         uses: actions/upload-artifact@v4
         with:
@@ -95,10 +95,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
-        
+
       - name: Create Release
         uses: actions/create-release@v1
         env:
@@ -108,10 +108,10 @@ jobs:
           release_name: Release ${{ github.ref_name }}
           body: |
             ## Text lol
-            
+
           draft: false
           prerelease: false
-          
+
       - name: Upload Release Assets
         uses: actions/upload-release-asset@v1
         env:

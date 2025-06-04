@@ -9,6 +9,5 @@ out
 generated
 node_modules
 npm-debug.log*
-package-lock.json
 docker-compose.override.yml
 tests/
