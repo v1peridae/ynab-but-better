@@ -21,7 +21,9 @@ jobs:
         with:
           node-version: "18"
           cache: "npm"
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: |
+            server/package-lock.json
+            frontend/package-lock.json
 
       - name: Install server dependencies
         run: cd server && npm ci
@@ -39,6 +41,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "18"
+          cache: "npm"
+          cache-dependency-path: server/package-lock.json
 
       - name: Install server dependencies
         run: cd server && npm ci --only=production
@@ -64,12 +68,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "18"
-
-      - name: Setup Expo
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
         run: cd frontend && npm ci
@@ -77,7 +77,7 @@ jobs:
       - name: Build for production
         run: |
           cd frontend
-          npx expo export --platform all
+          npx expo export --platform web
 
       - name: Create mobile archive
         run: |
@@ -93,6 +93,8 @@ jobs:
   release:
     needs: [build-server, build-mobile]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -100,24 +102,19 @@ jobs:
         uses: actions/download-artifact@v4
 
       - name: Create Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           body: |
-            ## Text lol
+            ## What's Changed
+            - API build included :3
+            - App build included!!
 
+          files: |
+            ./server-build/server-${{ github.ref_name }}.tar.gz
+            ./mobile-build/mobile-${{ github.ref_name }}.tar.gz
           draft: false
           prerelease: false
-
-      - name: Upload Release Assets
-        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./server-build/server-${{ github.ref_name }}.tar.gz
-          asset_name: server-${{ github.ref_name }}.tar.gz
-          asset_content_type: application/gzip
