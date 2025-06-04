@@ -18,6 +18,8 @@ interface UserData {
   name?: string;
   accounts?: Account[];
   categories?: Category[];
+  currency?: string;
+  notifications?: boolean;
 }
 
 interface OnboardingCompleteProps {
@@ -40,16 +42,16 @@ export default function OnboardingComplete({
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0D0E14" />
-      <View style={styles.innerContainer}>
-        <View style={styles.header}>
-          <Text style={styles.mainText}>Sense</Text>
-          <Text style={styles.subtitle}>have control</Text>
-        </View>
-        <View style={styles.progressContainer}>
-          <ProgressDots totalSteps={totalSteps} currentStep={currentStep} onStepPress={onStepPress} />
-          <Text style={styles.stepText}>{`Step ${currentStep} of ${totalSteps}`}</Text>
-        </View>
-        <ScrollView style={{ width: "100%" }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1, width: "100%" }} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.innerContainer}>
+          <View style={styles.header}>
+            <Text style={styles.mainText}>Sense</Text>
+            <Text style={styles.subtitle}>have control</Text>
+          </View>
+          <View style={styles.progressContainer}>
+            <ProgressDots totalSteps={totalSteps} currentStep={currentStep} onStepPress={onStepPress} />
+            <Text style={styles.stepText}>{`Step ${currentStep} of ${totalSteps}`}</Text>
+          </View>
           <View style={styles.content}>
             <Text style={styles.question}>You&apos;re All Set!</Text>
             <Text style={styles.description}>Welcome to Sense, {userData.name}! Your budgeting journey begins now.</Text>
@@ -57,9 +59,15 @@ export default function OnboardingComplete({
               <View style={styles.summarySection}>
                 <Text style={styles.summaryTitle}>Your Accounts</Text>
                 {userData.accounts.map((account, index) => (
-                  <View key={index} style={styles.summaryItem}>
-                    <Text style={styles.summaryItemName}>{account.name}</Text>
-                    <Text style={styles.summaryItemBalance}>${(account.balance / 100).toFixed(2)}</Text>
+                  <View key={index} style={styles.accountCard}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.accountName}>{account.name}</Text>
+                      <Text style={styles.accountType}>{account.type}</Text>
+                    </View>
+                    <Text style={styles.accountBalance}>
+                      {userData.currency || "$"}
+                      {(account.balance / 100).toFixed(2)}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -67,47 +75,89 @@ export default function OnboardingComplete({
             {userData.categories && userData.categories.length > 0 && (
               <View style={styles.summarySection}>
                 <Text style={styles.summaryTitle}>Your Categories</Text>
-                <Text style={styles.categoryCount}>{userData.categories.length} categories configured</Text>
+                <View style={styles.categoriesContainer}>
+                  {userData.categories.map((category) => (
+                    <View key={category.id} style={styles.categoryButton}>
+                      <Text style={styles.categoryText}>{category.name}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             )}
+            <View style={styles.summarySection}>
+              <Text style={styles.summaryTitle}>Your Preferences</Text>
+              {userData.currency && (
+                <View style={styles.preferenceItem}>
+                  <Text style={styles.preferenceText}>Currency: {userData.currency}</Text>
+                </View>
+              )}
+              <View style={styles.preferenceItem}>
+                <Text style={styles.preferenceText}>
+                  {userData.notifications !== false ? "Notifications are now on" : "Notifications are off"}
+                </Text>
+              </View>
+            </View>
             <TouchableOpacity style={styles.continueButton} onPress={onComplete}>
               <Text style={styles.buttonText}>Get Started</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0D0E14", alignItems: "center", justifyContent: "center" },
-  innerContainer: { width: "100%", maxWidth: 320, alignItems: "center", justifyContent: "center", flex: 1 },
+  innerContainer: { width: "100%", maxWidth: 340, alignItems: "center", justifyContent: "center", flex: 1 },
   header: { alignItems: "center", marginBottom: 40 },
   mainText: { fontSize: 72, fontWeight: "500", color: "#575F72", letterSpacing: -2, marginBottom: 8 },
   subtitle: { fontSize: 20, color: "#666", fontWeight: "400", letterSpacing: 1, marginTop: -30 },
   progressContainer: { alignItems: "center", marginBottom: 40 },
   stepText: { color: "#666", fontSize: 14 },
-  scrollContent: { alignItems: "center", paddingBottom: 40 },
-  content: { width: "100%", maxWidth: 320, alignItems: "center" },
-  question: { color: "#666", fontSize: 24, fontWeight: "400", textAlign: "center", marginBottom: 10 },
-  description: { color: "#666", fontSize: 16, textAlign: "center", marginBottom: 40, opacity: 0.8 },
-  summarySection: { width: "100%", marginBottom: 30 },
-  summaryTitle: { color: "#E5E5E5", fontSize: 18, fontWeight: "600", marginBottom: 15, textAlign: "center" },
-  summaryItem: {
+  scrollContainer: { alignItems: "center", paddingBottom: 40 },
+  content: { width: "100%", maxWidth: 340, alignItems: "center" },
+  question: { color: "#575F72", fontSize: 26, fontWeight: "600", textAlign: "center", marginBottom: 10 },
+  description: { color: "#666", fontSize: 16, textAlign: "center", marginBottom: 40, opacity: 0.9 },
+  summarySection: { width: "100%", marginBottom: 30, alignItems: "center" },
+  summaryTitle: { color: "#E5E5E5", fontSize: 20, fontWeight: "600", marginBottom: 15, textAlign: "center" },
+  accountCard: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 12,
     backgroundColor: "#252933",
     opacity: 0.5,
-    borderRadius: 18,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    width: "100%",
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    width: 280,
+    alignSelf: "center",
   },
-  summaryItemName: { color: "#E5E5E5", fontSize: 16, flex: 1 },
-  summaryItemBalance: { color: "#E5E5E5", fontSize: 16, fontWeight: "600" },
-  categoryCount: { color: "#E5E5E5", fontSize: 16, textAlign: "center", opacity: 0.8 },
+  accountName: { color: "#E5E5E5", fontSize: 16, fontWeight: "600" },
+  accountType: { color: "#666", fontSize: 13, fontWeight: "400" },
+  accountBalance: { color: "#575F72", fontSize: 16, fontWeight: "600" },
+  categoriesContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", width: "100%", gap: 8 },
+  categoryButton: {
+    backgroundColor: "#575F72",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 13,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  categoryText: { fontSize: 14, fontWeight: "500", color: "#E5E5E5", textAlign: "center" },
+  preferenceItem: {
+    backgroundColor: "#252933",
+    opacity: 0.7,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 8,
+    width: 260,
+    alignItems: "center",
+    alignSelf: "center",
+  },
+  preferenceText: { color: "#E5E5E5", fontSize: 15, fontWeight: "500", textAlign: "center" },
   continueButton: {
     backgroundColor: "#252933",
     opacity: 0.5,

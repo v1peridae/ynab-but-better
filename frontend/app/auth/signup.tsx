@@ -51,9 +51,11 @@ export default function SignUpScreen() {
 
       if (response.token && response.refreshToken) {
         await authLogin(response.token, response.refreshToken, false);
+        router.replace("/onboarding");
+      } else {
+        Alert.alert("Error", "Please try logging in.");
+        router.replace("/auth/login");
       }
-
-      router.replace("/onboarding");
     } catch (error) {
       Alert.alert("Error", error instanceof Error ? error.message : "An unexpected error occurred during signup");
     } finally {

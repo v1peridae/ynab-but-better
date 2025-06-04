@@ -116,6 +116,17 @@ async function applyExpenseDelta(transaction, userId, categoryId, dateIso, delta
 
 app.post("/transactions", verifyAuth, async (req, res) => {
   const { amount, accountId, description, categoryId } = req.body;
+  if (amount < 0) {
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+    });
+    if (!account) {
+      return res.status(404).json({ error: "Account not found" });
+    }
+    if (account.balance + amount < 0) {
+      return res.status(400).json({ error: "Insufficient funds in the account." });
+    }
+  }
 
   const created = await prisma.$transaction(async (dbTransaction) => {
     const transactionRecord = await dbTransaction.transaction.create({
@@ -803,6 +814,9 @@ app.patch("/user/preferences", verifyAuth, async (req, res) => {
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
+  if (res.headersSent) {
+    return next(err);
+  }
   res.status(500).json({ error: "Internal Server Error" });
 });
 
