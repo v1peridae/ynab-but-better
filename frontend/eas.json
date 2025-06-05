@@ -6,7 +6,8 @@
   "build": {
     "development": {
       "android": {
-        "image": "latest"
+        "image": "latest",
+        "credentialsSource": "remote"
       },
       "ios": {
         "image": "latest",
@@ -17,6 +18,10 @@
       "distribution": "internal"
     },
     "preview": {
+      "android": {
+        "buildType": "apk",
+        "credentialsSource": "remote"
+      },
       "distribution": "internal"
     },
     "production": {

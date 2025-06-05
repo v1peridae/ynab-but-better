@@ -30,6 +30,7 @@ function RootLayoutContent() {
         <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen name="assign" options={{ headerShown: false }} />
         <Stack.Screen name="goals" options={{ headerShown: false }} />
+        <Stack.Screen name="start" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

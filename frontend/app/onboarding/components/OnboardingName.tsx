@@ -52,7 +52,7 @@ export default function OnboardingName({ onNext, currentStep, totalSteps, onStep
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0D0E14", alignItems: "center", paddingTop: 20 },
   header: { alignItems: "center", marginBottom: 60 },
-  mainText: { fontSize: 72, fontWeight: "500", color: "#575F72", letterSpacing: -2, marginBottom: 8 },
+  mainText: { fontSize: 72, fontWeight: "500", color: "#575F72", letterSpacing: -2, marginBottom: 8, marginTop: 60 },
   subtitle: { fontSize: 20, color: "#666", fontWeight: "400", letterSpacing: 1, marginTop: -30 },
   progressContainer: { alignItems: "center", marginBottom: 60 },
   progressDots: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
