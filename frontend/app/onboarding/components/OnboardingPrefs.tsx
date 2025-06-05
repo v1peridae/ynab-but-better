@@ -14,11 +14,11 @@ const CURRENCIES = [
 ];
 
 const DATE_FORMATS = [
-  { id: "MM/DD/YYYY", name: "MM/DD/YYYY (12/31/2023)" },
-  { id: "DD/MM/YYYY", name: "DD/MM/YYYY (31/12/2023)" },
-  { id: "YYYY-MM-DD", name: "YYYY-MM-DD (2023-12-31)" },
-  { id: "DD-MM-YYYY", name: "DD-MM-YYYY (31-12-2023)" },
-  { id: "MM-DD-YYYY", name: "MM-DD-YYYY (12-31-2023)" },
+  { id: "MM/DD/YYYY", name: "MM/DD/YYYY" },
+  { id: "DD/MM/YYYY", name: "DD/MM/YYYY" },
+  { id: "YYYY-MM-DD", name: "YYYY-MM-DD" },
+  { id: "DD-MM-YYYY", name: "DD-MM-YYYY" },
+  { id: "MM-DD-YYYY", name: "MM-DD-YYYY" },
 ];
 
 const THEMES = [
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0D0E14", alignItems: "center", justifyContent: "center" },
   innerContainer: { width: "100%", maxWidth: 320, alignItems: "center", justifyContent: "center", flex: 1 },
   header: { alignItems: "center", marginBottom: 40 },
-  mainText: { fontSize: 72, fontWeight: "500", color: "#575F72", letterSpacing: -2, marginBottom: 8 },
+  mainText: { fontSize: 72, fontWeight: "500", color: "#575F72", letterSpacing: -2, marginBottom: 8, marginTop: 60 },
   subtitle: { fontSize: 20, color: "#666", fontWeight: "400", letterSpacing: 1, marginTop: -30 },
   progressContainer: { alignItems: "center", marginBottom: 40 },
   stepText: { color: "#666", fontSize: 14 },

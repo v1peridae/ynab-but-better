@@ -6,15 +6,22 @@
   "build": {
     "development": {
       "android": {
-        "image": "latest"
+        "image": "latest",
+        "credentialsSource": "remote"
       },
       "ios": {
-        "image": "latest"
+        "image": "latest",
+        "simulator": false,
+        "buildConfiguration": "Debug"
       },
       "developmentClient": true,
       "distribution": "internal"
     },
     "preview": {
+      "android": {
+        "buildType": "apk",
+        "credentialsSource": "remote"
+      },
       "distribution": "internal"
     },
     "production": {

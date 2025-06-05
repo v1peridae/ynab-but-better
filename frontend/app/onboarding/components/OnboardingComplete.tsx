@@ -48,10 +48,6 @@ export default function OnboardingComplete({
             <Text style={styles.mainText}>Sense</Text>
             <Text style={styles.subtitle}>have control</Text>
           </View>
-          <View style={styles.progressContainer}>
-            <ProgressDots totalSteps={totalSteps} currentStep={currentStep} onStepPress={onStepPress} />
-            <Text style={styles.stepText}>{`Step ${currentStep} of ${totalSteps}`}</Text>
-          </View>
           <View style={styles.content}>
             <Text style={styles.question}>You&apos;re All Set!</Text>
             <Text style={styles.description}>Welcome to Sense, {userData.name}! Your budgeting journey begins now.</Text>
@@ -110,7 +106,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0D0E14", alignItems: "center", justifyContent: "center" },
   innerContainer: { width: "100%", maxWidth: 340, alignItems: "center", justifyContent: "center", flex: 1 },
   header: { alignItems: "center", marginBottom: 40 },
-  mainText: { fontSize: 72, fontWeight: "500", color: "#575F72", letterSpacing: -2, marginBottom: 8 },
+  mainText: { fontSize: 72, fontWeight: "500", color: "#575F72", letterSpacing: -2, marginBottom: 8, marginTop: 60 },
   subtitle: { fontSize: 20, color: "#666", fontWeight: "400", letterSpacing: 1, marginTop: -30 },
   progressContainer: { alignItems: "center", marginBottom: 40 },
   stepText: { color: "#666", fontSize: 14 },

@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { alignItems: "center", paddingBottom: 40 },
   header: { alignItems: "center", marginTop: 80, marginBottom: 40 },
-  mainText: { fontSize: 72, fontWeight: "500", color: "#575F72", letterSpacing: -2, marginBottom: 8 },
+  mainText: { fontSize: 72, fontWeight: "500", color: "#575F72", letterSpacing: -2, marginBottom: 8, marginTop: 60 },
   subtitle: { fontSize: 20, color: "#666", fontWeight: "400", letterSpacing: 1, marginTop: -30 },
   progressContainer: { alignItems: "center", marginBottom: 40 },
   stepText: { color: "#666", fontSize: 14 },

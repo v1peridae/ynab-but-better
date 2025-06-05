@@ -30,15 +30,15 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: "",
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={"#575F72"} />,
         }}
       />
       <Tabs.Screen
         name="transactions"
         options={{
-          title: "Transactions",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="creditcard.fill" color={color} />,
+          title: "",
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="creditcard.fill" color={"#575F72"} />,
         }}
       />
       <Tabs.Screen
@@ -50,14 +50,14 @@ export default function TabLayout() {
               style={{
                 width: 50,
                 height: 50,
-                backgroundColor: "#000000",
+                backgroundColor: "#0D0E14",
                 borderRadius: 25,
                 justifyContent: "center",
                 alignItems: "center",
                 marginBottom: 20,
               }}
             >
-              <Ionicons name="add" size={30} color="#FFFFFF" />
+              <Ionicons name="add" size={30} color="#575F72" />
             </View>
           ),
         }}
@@ -65,15 +65,15 @@ export default function TabLayout() {
       <Tabs.Screen
         name="summary"
         options={{
-          title: "Summary",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
+          title: "",
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={"#575F72"} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+          title: "",
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={"#575F72"} />,
         }}
       />
     </Tabs>
