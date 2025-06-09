@@ -40,15 +40,18 @@ interface OnboardingPrefsProps {
   currentStep: number;
   totalSteps: number;
   onStepPress: (step: number) => void;
+  initialData?: { preferences: Preferences };
 }
 
-export default function OnboardingPrefs({ onNext, onBack, currentStep, totalSteps, onStepPress }: OnboardingPrefsProps) {
-  const [preferences, setPreferences] = useState<Preferences>({
-    currency: "USD",
-    dateFormat: "MM/DD/YYYY",
-    theme: "auto",
-    notifications: true,
-  });
+export default function OnboardingPrefs({ onNext, onBack, currentStep, totalSteps, onStepPress, initialData }: OnboardingPrefsProps) {
+  const [preferences, setPreferences] = useState<Preferences>(
+    initialData?.preferences || {
+      currency: "USD",
+      dateFormat: "MM/DD/YYYY",
+      theme: "auto",
+      notifications: true,
+    }
+  );
 
   const updatePreference = (key: keyof Preferences, value: string | boolean) => {
     setPreferences((prev) => ({ ...prev, [key]: value }));

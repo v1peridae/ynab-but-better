@@ -11,6 +11,9 @@ interface Transaction {
   description: string;
   amount: number;
   date: string;
+  category?: {
+    name: string;
+  };
   account?: {
     name: string;
   };
@@ -83,6 +86,7 @@ export default function TransactionsScreen() {
         <View style={styles.transactionItem}>
           <View style={styles.transactionContent}>
             <ThemedText style={styles.transactionDescription}>{item.description}</ThemedText>
+            {item.category && <ThemedText style={styles.categoryName}>{item.category.name}</ThemedText>}
             <ThemedText style={styles.accountName}>{item.account?.name}</ThemedText>
           </View>
           <FormattedCurrency amount={item.amount} style={[styles.amount, { color: isPositive ? "#4CAF50" : "#F44336" }]} showSign={true} />
@@ -143,11 +147,13 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#333",
+    backgroundColor: "#252933",
   },
   transactionContent: { flex: 1 },
-  transactionDescription: { fontSize: 16, color: "#E5E5E5", fontWeight: "500" },
-  accountName: { fontSize: 14, color: "#666", marginTop: 4 },
-  amount: { fontSize: 16, fontWeight: "bold" },
+  transactionDescription: { fontSize: 20, color: "#E5E5E5", fontWeight: "500" },
+  categoryName: { fontSize: 14, color: "#FFF", marginTop: 2, fontStyle: "italic" },
+  accountName: { fontSize: 14, color: "#FFF", marginTop: 4 },
+  amount: { fontSize: 20, fontWeight: "bold" },
   emptyContainer: { alignItems: "center", paddingVertical: 40 },
   emptyText: { color: "#666", fontSize: 16 },
   loader: { marginTop: 20 },

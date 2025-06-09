@@ -281,19 +281,20 @@ app.get("/user/dashboard", verifyAuth, async (req, res) => {
       include: { category: true },
     });
 
+    const expenseTransactions = thisWeeksTransactions.filter((t) => t.amount < 0);
     const topPurchase =
-      thisWeeksTransactions.length > 0
-        ? thisWeeksTransactions.reduce((prev, current) => (prev.amount < current.amount ? current : prev))
+      expenseTransactions.length > 0
+        ? expenseTransactions.reduce((prev, current) => (prev.amount < current.amount ? prev : current))
         : null;
 
     const categorySpending = {};
     thisWeeksTransactions.forEach((transaction) => {
-      if (transaction.categoryId && transaction.category) {
+      if (transaction.categoryId && transaction.category && transaction.amount < 0) {
         const categoryName = transaction.category.name;
         if (!categorySpending[categoryName]) {
           categorySpending[categoryName] = 0;
         }
-        categorySpending[categoryName] += transaction.amount;
+        categorySpending[categoryName] += Math.abs(transaction.amount);
       }
     });
 
@@ -346,6 +347,7 @@ app.get("/user/dashboard", verifyAuth, async (req, res) => {
 app.get("/transactions", verifyAuth, async (req, res) => {
   const transactions = await prisma.transaction.findMany({
     where: { userId: req.user.userId },
+    include: { account: true, category: true },
   });
   res.json(transactions);
 });
