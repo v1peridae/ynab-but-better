@@ -20,6 +20,7 @@ model User {
   goals                 Goal[]
   recurringTransactions RecurringTransaction[]
   refreshTokens         RefreshToken[]
+  profilePicture        String?
 }
 
 model RefreshToken {
