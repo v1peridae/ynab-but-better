@@ -128,7 +128,7 @@ export default function IndexScreen() {
         <ThemedText>{item.description || "something"}</ThemedText>
         <ThemedText style={styles.accountName}>{item.account?.name || "Checking account"}</ThemedText>
       </View>
-      <FormattedCurrency amount={item.amount} style={styles.transactionAmount} showSign={item.amount > 0} />
+      <FormattedCurrency amount={item.amount} style={styles.transactionAmount} showSign={true} />
     </View>
   );
 

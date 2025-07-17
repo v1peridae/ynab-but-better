@@ -129,7 +129,7 @@ export default function TransactionsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 60, backgroundColor: "#0D0E14" },
   header: { paddingHorizontal: 20, marginBottom: 20, marginTop: 20 },
-  title: { fontSize: 28, fontWeight: "600", color: "#E5E5E5" },
+  title: { fontSize: 28, fontWeight: "600", color: "#E5E5E5", paddingTop: 20 },
   transactionsCard: {
     flex: 1,
     backgroundColor: "#252933",

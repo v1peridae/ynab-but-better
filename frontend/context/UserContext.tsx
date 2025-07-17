@@ -15,6 +15,7 @@ interface UserContextType {
   fetchProfile: () => Promise<void>;
   updateProfile: (name?: string, profilePictureUri?: string) => Promise<void>;
   deleteProfilePicture: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType>({
@@ -23,6 +24,7 @@ const UserContext = createContext<UserContextType>({
   fetchProfile: async () => {},
   updateProfile: async () => {},
   deleteProfilePicture: async () => {},
+  refreshProfile: async () => {},
 });
 
 export const useUser = () => useContext(UserContext);
@@ -108,6 +110,18 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const refreshProfile = async () => {
+    if (!token || !isLoggedIn) return;
+    setLoading(true);
+    try {
+      await fetchProfile();
+    } catch (error) {
+      console.error("Error refreshing profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isLoggedIn) {
       fetchProfile();
@@ -117,7 +131,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   }, [isLoggedIn, token]);
 
   return (
-    <UserContext.Provider value={{ profile, loading, fetchProfile, updateProfile, deleteProfilePicture }}>{children}</UserContext.Provider>
+    <UserContext.Provider value={{ profile, loading, fetchProfile, updateProfile, deleteProfilePicture, refreshProfile }}>
+      {children}
+    </UserContext.Provider>
   );
 };
 

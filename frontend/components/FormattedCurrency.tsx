@@ -22,7 +22,7 @@ export const FormattedCurrency: React.FC<FormattedCurrencyProps> = ({
 }) => {
   const { formatCurrency, preferences } = usePreferences();
   const isPositive = amount >= 0;
-  const sign = showSign && isPositive ? "+" : "";
+  const sign = showSign ? (isPositive ? "+" : "-") : "";
 
   if (splitFormat) {
     const symbol = preferences.currency === "USD" ? "$" : preferences.currency === "EUR" ? "€" : preferences.currency === "GBP" ? "£" : "$";
