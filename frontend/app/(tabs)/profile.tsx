@@ -53,6 +53,10 @@ export default function ProfileScreen() {
     router.push("/settings");
   };
 
+  const navigateToCategories = () => {
+    router.push("/categories");
+  };
+
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
@@ -229,7 +233,7 @@ export default function ProfileScreen() {
             <ThemedText style={styles.menuText}>Manage Accounts</ThemedText>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={navigateToCategories}>
             <ThemedText style={styles.menuText}>Manage Categories</ThemedText>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
