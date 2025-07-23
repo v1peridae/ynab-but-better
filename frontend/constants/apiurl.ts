@@ -12,7 +12,13 @@ const getApiUrl = () => {
   return "http://165.232.130.152:3000";
 };
 
-const apiUrl = getApiUrl();
-console.log("Using API URL:", apiUrl);
+const apiUrl =
+  process.env.NODE_ENV === "production"
+    ? "http://ynab-but-better.railway.internal:3000"
+    : (() => {
+        const hostUri = Constants.expoConfig?.hostUri;
+        const hostname = hostUri?.split(":")[0];
+        return hostname ? `http://${hostname}:3000` : "http://localhost:3000";
+      })();
 
 export const API_URL = apiUrl;
