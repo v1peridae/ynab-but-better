@@ -57,6 +57,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await SecureStore.deleteItemAsync("token");
       await SecureStore.deleteItemAsync("refreshToken");
+      await SecureStore.deleteItemAsync("onboarding_complete");
+      await SecureStore.deleteItemAsync("onboarding_progress");
       setToken(null);
       router.replace("/auth/login");
     } catch (error) {

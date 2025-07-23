@@ -11,3 +11,6 @@ node_modules
 npm-debug.log*
 docker-compose.override.yml
 tests/
+uploads/
+package-lock.json
+package.json

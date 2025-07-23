@@ -1,20 +1,10 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { View, StyleSheet, TouchableOpacity, ScrollView, Switch, Modal } from "react-native";
-import { ThemedView } from "@/components/ThemedView";
+import React, { useState } from "react";
+import { View, StyleSheet, TouchableOpacity, ScrollView, Switch, StatusBar } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
-import { useThemeColor } from "@/hooks/useThemeColor";
-import { useAuth } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { API_URL } from "@/constants/apiurl";
 import { usePreferences } from "@/context/PreferencesContext";
-
-interface UserPreferences {
-  currency: string;
-  dateFormat: string;
-  theme: string;
-  notifications: boolean;
-}
+import { Picker } from "@react-native-picker/picker";
 
 const CURRENCIES = [
   { code: "USD", name: "US Dollar ($)" },
@@ -41,75 +31,87 @@ const THEMES = [
 ];
 
 export default function SettingsScreen() {
-  const { token } = useAuth();
   const { preferences, updatePreference, loading } = usePreferences();
-  const backgroundColor = useThemeColor({ light: "#f8f9fa", dark: "#1c1c1e" }, "background");
-  const tintColor = useThemeColor({}, "tint");
-
-  // Modal states
-  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
-  const [showDateFormatPicker, setShowDateFormatPicker] = useState(false);
-  const [showThemePicker, setShowThemePicker] = useState(false);
 
   const SettingsSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <View style={styles.section}>
       <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
-      <View style={[styles.sectionContent, { backgroundColor }]}>{children}</View>
+      <View style={styles.sectionContent}>{children}</View>
     </View>
   );
 
-  const SettingsRow = ({
-    icon,
-    title,
-    subtitle,
-    children,
-    onPress,
-  }: {
-    icon: string;
-    title: string;
-    subtitle?: string;
-    children?: React.ReactNode;
-    onPress?: () => void;
-  }) => (
-    <TouchableOpacity style={styles.settingsRow} onPress={onPress} disabled={!onPress}>
+  const SettingsRow = ({ icon, title, children }: { icon: string; title: string; children?: React.ReactNode }) => (
+    <View style={styles.settingsRow}>
       <View style={styles.settingsRowLeft}>
-        <Ionicons name={icon as any} size={24} color="#FFFFFF" />
+        <Ionicons name={icon as any} size={24} color="#E5E5E5" />
         <View style={styles.settingsRowText}>
           <ThemedText style={styles.settingsRowTitle}>{title}</ThemedText>
-          {subtitle && <ThemedText style={styles.settingsRowSubtitle}>{subtitle}</ThemedText>}
         </View>
       </View>
       {children}
-    </TouchableOpacity>
+    </View>
   );
 
-  const getSelectedOptionName = (value: string, options: { id: string; name: string }[]) => {
-    const option = options.find((opt) => opt.id === value);
-    return option ? option.name : value;
-  };
+  const PickerRow = ({
+    icon,
+    title,
+    selectedValue,
+    onValueChange,
+    options,
+  }: {
+    icon: string;
+    title: string;
+    selectedValue: string;
+    onValueChange: (value: string) => void;
+    options: { id: string; name: string }[];
+  }) => (
+    <View style={styles.pickerRowContainer}>
+      <View style={styles.pickerRowHeader}>
+        <Ionicons name={icon as any} size={24} color="#E5E5E5" />
+        <View style={styles.settingsRowText}>
+          <ThemedText style={styles.settingsRowTitle}>{title}</ThemedText>
+        </View>
+      </View>
+      <View style={styles.pickerContainer}>
+        <Picker
+          selectedValue={selectedValue}
+          style={styles.picker}
+          itemStyle={styles.pickerItem}
+          onValueChange={onValueChange}
+          dropdownIconColor="#E5E5E5"
+        >
+          {options.map((option) => (
+            <Picker.Item key={option.id} label={option.name} value={option.id} color="#E5E5E5" />
+          ))}
+        </Picker>
+      </View>
+    </View>
+  );
 
   if (loading) {
     return (
-      <ThemedView style={styles.container}>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#0D0E14" />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Ionicons name="arrow-back" size={24} color="#E5E5E5" />
           </TouchableOpacity>
           <ThemedText style={styles.headerTitle}>Settings</ThemedText>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.loadingContainer}>
-          <ThemedText>Loading...</ThemedText>
+          <ThemedText style={styles.loadingText}>Loading...</ThemedText>
         </View>
-      </ThemedView>
+      </View>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#0D0E14" />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} color="#E5E5E5" />
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>Settings</ThemedText>
         <View style={{ width: 24 }} />
@@ -117,129 +119,46 @@ export default function SettingsScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <SettingsSection title="Preferences">
-          <SettingsRow
+          <PickerRow
             icon="card-outline"
             title="Currency"
-            subtitle={getSelectedOptionName(
-              preferences.currency,
-              CURRENCIES.map((c) => ({ id: c.code, name: c.name }))
-            )}
-            onPress={() => setShowCurrencyPicker(true)}
-          >
-            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-          </SettingsRow>
+            selectedValue={preferences.currency}
+            onValueChange={(value) => updatePreference("currency", value)}
+            options={CURRENCIES.map((c) => ({ id: c.code, name: c.name }))}
+          />
 
-          <SettingsRow
+          <PickerRow
             icon="calendar-outline"
             title="Date Format"
-            subtitle={getSelectedOptionName(preferences.dateFormat, DATE_FORMATS)}
-            onPress={() => setShowDateFormatPicker(true)}
-          >
-            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-          </SettingsRow>
+            selectedValue={preferences.dateFormat}
+            onValueChange={(value) => updatePreference("dateFormat", value)}
+            options={DATE_FORMATS}
+          />
 
-          <SettingsRow
+          <PickerRow
             icon="color-palette-outline"
             title="Theme"
-            subtitle={getSelectedOptionName(preferences.theme, THEMES)}
-            onPress={() => setShowThemePicker(true)}
-          >
-            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-          </SettingsRow>
+            selectedValue={preferences.theme}
+            onValueChange={(value) => updatePreference("theme", value)}
+            options={THEMES}
+          />
 
-          <SettingsRow icon="notifications-outline" title="Notifications" subtitle="Enable push notifications">
+          <SettingsRow icon="notifications-outline" title="Notifications">
             <Switch
               value={preferences.notifications}
               onValueChange={(value) => updatePreference("notifications", value)}
-              trackColor={{ false: "#767577", true: tintColor }}
+              trackColor={{ false: "#767577", true: "#E5E5E5" }}
               thumbColor={preferences.notifications ? "#f4f3f4" : "#f4f3f4"}
             />
           </SettingsRow>
         </SettingsSection>
       </ScrollView>
-
-      <Modal visible={showCurrencyPicker} transparent animationType="slide" onRequestClose={() => setShowCurrencyPicker(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor }]}>
-            <ThemedText style={styles.modalTitle}>Select Currency</ThemedText>
-            <ScrollView style={styles.modalScrollView}>
-              {CURRENCIES.map((currency) => (
-                <TouchableOpacity
-                  key={currency.code}
-                  style={styles.modalItem}
-                  onPress={() => {
-                    updatePreference("currency", currency.code);
-                    setShowCurrencyPicker(false);
-                  }}
-                >
-                  <ThemedText style={preferences.currency === currency.code ? styles.selectedItemText : undefined}>
-                    {currency.name}
-                  </ThemedText>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setShowCurrencyPicker(false)}>
-              <ThemedText style={styles.modalCloseText}>Close</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={showDateFormatPicker} transparent animationType="slide" onRequestClose={() => setShowDateFormatPicker(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor }]}>
-            <ThemedText style={styles.modalTitle}>Select Date Format</ThemedText>
-            <ScrollView style={styles.modalScrollView}>
-              {DATE_FORMATS.map((format) => (
-                <TouchableOpacity
-                  key={format.id}
-                  style={styles.modalItem}
-                  onPress={() => {
-                    updatePreference("dateFormat", format.id);
-                    setShowDateFormatPicker(false);
-                  }}
-                >
-                  <ThemedText style={preferences.dateFormat === format.id ? styles.selectedItemText : undefined}>{format.name}</ThemedText>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setShowDateFormatPicker(false)}>
-              <ThemedText style={styles.modalCloseText}>Close</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={showThemePicker} transparent animationType="slide" onRequestClose={() => setShowThemePicker(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor }]}>
-            <ThemedText style={styles.modalTitle}>Select Theme</ThemedText>
-            <ScrollView style={styles.modalScrollView}>
-              {THEMES.map((theme) => (
-                <TouchableOpacity
-                  key={theme.id}
-                  style={styles.modalItem}
-                  onPress={() => {
-                    updatePreference("theme", theme.id);
-                    setShowThemePicker(false);
-                  }}
-                >
-                  <ThemedText style={preferences.theme === theme.id ? styles.selectedItemText : undefined}>{theme.name}</ThemedText>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setShowThemePicker(false)}>
-              <ThemedText style={styles.modalCloseText}>Close</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, paddingTop: 60, backgroundColor: "#0D0E14" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -249,39 +168,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   backButton: { padding: 10 },
-  headerTitle: { fontSize: 20, fontWeight: "bold" },
+  headerTitle: { fontSize: 28, fontWeight: "600", color: "#E5E5E5" },
   content: { flex: 1, paddingHorizontal: 20 },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { color: "#E5E5E5", fontSize: 16 },
   section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 14, fontWeight: "600", marginBottom: 8, opacity: 0.7, textTransform: "uppercase", letterSpacing: 0.5 },
-  sectionContent: { borderRadius: 12, overflow: "hidden" },
+  sectionTitle: { fontSize: 20, fontWeight: "600", color: "#E5E5E5", marginBottom: 16 },
+  sectionContent: { backgroundColor: "#252933", opacity: 0.5, borderRadius: 18, overflow: "hidden" },
   settingsRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#222",
+    borderBottomColor: "#333",
   },
   settingsRowLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
-  settingsRowText: { marginLeft: 12, flex: 1 },
-  settingsRowTitle: { fontSize: 16, fontWeight: "600" },
-  settingsRowSubtitle: { fontSize: 14, opacity: 0.7, margin: 2 },
-  modalOverlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" },
-  modalContent: {
-    width: "80%",
-    maxHeight: "60%",
-    borderRadius: 10,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  modalTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 15, textAlign: "center" },
-  modalScrollView: { maxHeight: 300 },
-  modalItem: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#333" },
-  selectedItemText: { fontWeight: "bold", color: "#FFFFFF" },
-  modalCloseButton: { marginTop: 15, padding: 10, backgroundColor: "#000000", borderRadius: 5, alignItems: "center" },
-  modalCloseText: { color: "#FFFFFF", fontWeight: "bold" },
+  settingsRowText: { marginLeft: 16, flex: 1 },
+  settingsRowTitle: { fontSize: 16, fontWeight: "600", color: "#E5E5E5" },
+  pickerRowContainer: { padding: 20, borderBottomWidth: 1, borderBottomColor: "#333" },
+  pickerRowHeader: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  pickerContainer: { height: 50, borderRadius: 18, overflow: "hidden" },
+  picker: { height: 50, color: "#E5E5E5", backgroundColor: "transparent" },
+  pickerItem: { height:
+     50, fontSize: 16, color: "#E5E5E5" },
 });

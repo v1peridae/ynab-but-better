@@ -281,19 +281,20 @@ app.get("/user/dashboard", verifyAuth, async (req, res) => {
       include: { category: true },
     });
 
+    const expenseTransactions = thisWeeksTransactions.filter((t) => t.amount < 0);
     const topPurchase =
-      thisWeeksTransactions.length > 0
-        ? thisWeeksTransactions.reduce((prev, current) => (prev.amount < current.amount ? current : prev))
+      expenseTransactions.length > 0
+        ? expenseTransactions.reduce((prev, current) => (prev.amount < current.amount ? prev : current))
         : null;
 
     const categorySpending = {};
     thisWeeksTransactions.forEach((transaction) => {
-      if (transaction.categoryId && transaction.category) {
+      if (transaction.categoryId && transaction.category && transaction.amount < 0) {
         const categoryName = transaction.category.name;
         if (!categorySpending[categoryName]) {
           categorySpending[categoryName] = 0;
         }
-        categorySpending[categoryName] += transaction.amount;
+        categorySpending[categoryName] += Math.abs(transaction.amount);
       }
     });
 
@@ -346,6 +347,7 @@ app.get("/user/dashboard", verifyAuth, async (req, res) => {
 app.get("/transactions", verifyAuth, async (req, res) => {
   const transactions = await prisma.transaction.findMany({
     where: { userId: req.user.userId },
+    include: { account: true, category: true },
   });
   res.json(transactions);
 });
@@ -763,14 +765,6 @@ app.get("/report/trends", verifyAuth, async (req, res) => {
   res.json(byMonth);
 });
 
-app.get("/user/profile", verifyAuth, async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.user.userId },
-    select: { email: true, name: true, preferences: true },
-  });
-  res.json(user);
-});
-
 app.patch("/user/password", verifyAuth, async (req, res) => {
   const { oldPassword, newPassword } = req.body;
   const user = await prisma.user.findUnique({
@@ -810,6 +804,105 @@ app.patch("/user/preferences", verifyAuth, async (req, res) => {
   });
 
   res.json({ message: "Preferences updated" });
+});
+
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = "uploads/profile-pictures";
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, `user-${req.user.userId}-${uniqueSuffix}${path.extname(file.originalname)}`);
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 1024 * 1024 * 5 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"), false);
+    }
+  },
+});
+
+app.use("/uploads", express.static("uploads"));
+
+app.get("/user/profile", verifyAuth, async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { email: true, name: true, preferences: true, profilePicture: true },
+  });
+  res.json(user);
+});
+
+app.patch("/user/profile", verifyAuth, upload.single("profilePicture"), async (req, res) => {
+  try {
+    const { name } = req.body;
+    const updateData = {};
+
+    if (name !== undefined) updateData.name = name;
+    if (req.file) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+        select: { profilePicture: true },
+      });
+      if (currentUser.profilePicture) {
+        const oldFilePath = currentUser.profilePicture.replace("/uploads/", "");
+        const fullPath = path.join("uploads", oldFilePath);
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+        }
+      }
+      updateData.profilePicture = `/uploads/${req.file.path.replace("uploads/", "")}`;
+    }
+    const user = await prisma.user.update({
+      where: { id: req.user.userId },
+      data: updateData,
+      select: { email: true, name: true, preferences: true, profilePicture: true },
+    });
+    res.json({ message: "Updates profile pic", user });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+app.delete("/user/profile-picture", verifyAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { profilePicture: true },
+    });
+    if (user.profilePicture) {
+      const filePath = user.profilePicture.replace("/uploads/", "");
+      const fullPath = path.join("uploads", filePath);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+
+      await prisma.user.update({
+        where: { id: req.user.userId },
+        data: { profilePicture: null },
+      });
+      res.json({ message: "Profile picture deleted" });
+    } else {
+      res.json({ message: "No profile picture to delete" });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to delete profile picture" });
+  }
 });
 
 app.use((err, req, res, next) => {

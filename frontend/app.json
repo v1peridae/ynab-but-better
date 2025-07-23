@@ -10,10 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.v1peridae.sense",
-      "buildNumber": "1.0.0",
+      "bundleIdentifier": "me.v1peridae.sense",
       "infoPlist": {
-        "LSApplicationQueriesSchemes": []
+        "LSApplicationQueriesSchemes": [],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -21,7 +21,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.v1peridae.sense",
+      "package": "me.v1peridae.sense",
       "edgeToEdgeEnabled": true
     },
     "web": {
@@ -40,7 +40,14 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos.",
+          "cameraPermission": "The app needs access to your camera."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
