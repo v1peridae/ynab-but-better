@@ -14,7 +14,7 @@ const getApiUrl = () => {
 
 const apiUrl =
   process.env.NODE_ENV === "production"
-    ? "http://ynab-but-better.railway.internal:3000"
+    ? "https://switchyard.proxy.rlwy.net:3000"
     : (() => {
         const hostUri = Constants.expoConfig?.hostUri;
         const hostname = hostUri?.split(":")[0];
