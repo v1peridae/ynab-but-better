@@ -5,7 +5,17 @@ require("dotenv").config();
 const { PrismaClient } = require("@prisma/client");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  log: ["error", "warn"],
+});
+prisma
+  .$connect()
+  .then(() => {
+    console.log("connected successfully");
+  })
+  .catch((error) => {
+    console.error("failed:", error);
+  });
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
@@ -36,8 +46,33 @@ if (process.env.NODE_ENV !== "test") {
 
 app.use("/auth", authRouter);
 
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "api",
+    timestamp: new Date().toISOString(),
+    status: "running",
+  });
+});
+
+app.get("/health", async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      database: "connected",
+      port: process.env.PORT || "not set",
+    });
+  } catch (error) {
+    console.error("health check failed:", error);
+    res.status(503).json({
+      status: "error",
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      database: "disconnected",
+    });
+  }
 });
 
 function verifyAccountOwner(req, res, next) {
@@ -918,8 +953,12 @@ app.use((err, req, res, next) => {
 });
 
 if (process.env.NODE_ENV !== "test") {
-  app.listen(process.env.PORT, "0.0.0.0", () => {
-    console.log(`Server is running on port ${process.env.PORT}`);
+  const port = process.env.PORT || 3000;
+  app.listen(port, "0.0.0.0", () => {
+    console.log(`Server is running on port ${port}`);
+    console.log(`env: ${process.env.NODE_ENV}`);
+    console.log(`dbURL: ${process.env.DATABASE_URL ? "Set" : "no"}`);
+    console.log(`JWT: ${process.env.JWT_SECRET ? "Set" : "no"}`);
   });
 }
 module.exports = app;
