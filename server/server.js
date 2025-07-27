@@ -36,6 +36,10 @@ if (process.env.NODE_ENV !== "test") {
 
 app.use("/auth", authRouter);
 
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 function verifyAccountOwner(req, res, next) {
   const accountId = Number(req.params.id);
   prisma.account
