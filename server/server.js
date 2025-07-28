@@ -37,7 +37,29 @@ if (process.env.NODE_ENV !== "test") {
 app.use("/auth", authRouter);
 
 app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    message: "server running",
+  });
+});
+
+app.get("/health/detailed", async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      database: "connected",
+    });
+  } catch (error) {
+    console.error("health check failed:", error);
+    res.status(503).json({
+      status: "error",
+      timestamp: new Date().toISOString(),
+      error: "DB connection failed",
+    });
+  }
 });
 
 function verifyAccountOwner(req, res, next) {
