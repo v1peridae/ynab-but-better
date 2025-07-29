@@ -34,6 +34,14 @@ if (process.env.NODE_ENV !== "test") {
   app.use(cors());
 }
 
+app.get("/", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    message: "Server is starting up",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use("/auth", authRouter);
 
 app.get("/health", (req, res) => {
@@ -940,8 +948,24 @@ app.use((err, req, res, next) => {
 });
 
 if (process.env.NODE_ENV !== "test") {
-  app.listen(process.env.PORT, "0.0.0.0", () => {
-    console.log(`Server is running on port ${process.env.PORT}`);
+  const port = process.env.PORT || 3000;
+
+  console.log("🚀 Starting server...");
+  console.log("📊 Environment variables:");
+  console.log("  - PORT:", process.env.PORT);
+  console.log("  - NODE_ENV:", process.env.NODE_ENV);
+  console.log("  - DATABASE_URL:", process.env.DATABASE_URL ? "SET" : "NOT SET");
+  console.log("  - JWT_SECRET:", process.env.JWT_SECRET ? "SET" : "NOT SET");
+  console.log("  - FRONTEND_URL:", process.env.FRONTEND_URL ? "SET" : "NOT SET");
+
+  app.listen(port, "0.0.0.0", () => {
+    console.log(`✅ Server is running on port ${port}`);
+    console.log(`🔍 Health check available at: http://localhost:${port}/health`);
+  });
+
+  // Handle server errors
+  app.on("error", (error) => {
+    console.error("❌ Server error:", error);
   });
 }
 module.exports = app;
