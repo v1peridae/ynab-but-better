@@ -15,4 +15,4 @@ const getDevelopmentUrl = () => {
   return "http://localhost:3000";
 };
 
-export const API_URL = process.env.NODE_ENV === "production" ? "https://delist-production-b447.up.railway.app" : getDevelopmentUrl();
+export const API_URL = "https://delist-production-b447.up.railway.app";
