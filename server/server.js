@@ -18,7 +18,7 @@ if (process.env.NODE_ENV !== "test") {
   app.use(helmet());
   app.use(
     cors({
-      origin: process.env.FRONTEND_URL,
+      origin: true,
       credentials: true,
     })
   );
@@ -34,7 +34,42 @@ if (process.env.NODE_ENV !== "test") {
   app.use(cors());
 }
 
+app.get("/", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    message: "Server is running",
+    timestamp: new Date().toISOString(),
+    port: process.env.PORT || 3000,
+    environment: process.env.NODE_ENV || "development",
+  });
+});
+
 app.use("/auth", authRouter);
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    message: "server running",
+  });
+});
+
+app.get("/health/detailed", async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      database: "connected",
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: "error",
+      timestamp: new Date().toISOString(),
+      error: "DB connection failed",
+    });
+  }
+});
 
 function verifyAccountOwner(req, res, next) {
   const accountId = Number(req.params.id);
@@ -74,7 +109,6 @@ function verifyAuth(req, res, next) {
     req.user = decoded;
     next();
   } catch (error) {
-    console.error("Auth error:", error);
     return res.status(401).json({ error: "invalid token" });
   }
 }
@@ -236,7 +270,6 @@ app.delete("/accounts/:id", [verifyAuth, verifyAccountOwner], async (req, res) =
 });
 
 app.get("/user/dashboard", verifyAuth, async (req, res) => {
-  // 1️⃣  Cash on hand
   const accounts = await prisma.account.findMany({ where: { userId: req.user.userId } });
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
   const month = new Date().toISOString().slice(0, 7);
@@ -262,86 +295,80 @@ app.get("/user/dashboard", verifyAuth, async (req, res) => {
   });
   const totalBudgeted = budgetMonth ? budgetMonth.items.reduce((sum, i) => sum + i.goal, 0) : 0;
   const unassigned = totalBalance - totalSpent;
-  try {
-    const recentTransactions = await prisma.transaction.findMany({
-      where: { userId: req.user.userId },
-      orderBy: { date: "desc" },
-      take: 7,
-      include: { account: true, category: true },
-    });
 
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const recentTransactions = await prisma.transaction.findMany({
+    where: { userId: req.user.userId },
+    orderBy: { date: "desc" },
+    take: 7,
+    include: { account: true, category: true },
+  });
 
-    const thisWeeksTransactions = await prisma.transaction.findMany({
-      where: {
-        userId: req.user.userId,
-        date: { gte: oneWeekAgo },
-      },
-      include: { category: true },
-    });
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    const expenseTransactions = thisWeeksTransactions.filter((t) => t.amount < 0);
-    const topPurchase =
-      expenseTransactions.length > 0
-        ? expenseTransactions.reduce((prev, current) => (prev.amount < current.amount ? prev : current))
-        : null;
+  const thisWeeksTransactions = await prisma.transaction.findMany({
+    where: {
+      userId: req.user.userId,
+      date: { gte: oneWeekAgo },
+    },
+    include: { category: true },
+  });
 
-    const categorySpending = {};
-    thisWeeksTransactions.forEach((transaction) => {
-      if (transaction.categoryId && transaction.category && transaction.amount < 0) {
-        const categoryName = transaction.category.name;
-        if (!categorySpending[categoryName]) {
-          categorySpending[categoryName] = 0;
-        }
-        categorySpending[categoryName] += Math.abs(transaction.amount);
+  const expenseTransactions = thisWeeksTransactions.filter((t) => t.amount < 0);
+  const topPurchase =
+    expenseTransactions.length > 0 ? expenseTransactions.reduce((prev, current) => (prev.amount < current.amount ? prev : current)) : null;
+
+  const categorySpending = {};
+  thisWeeksTransactions.forEach((transaction) => {
+    if (transaction.categoryId && transaction.category && transaction.amount < 0) {
+      const categoryName = transaction.category.name;
+      if (!categorySpending[categoryName]) {
+        categorySpending[categoryName] = 0;
       }
-    });
-
-    let topCategory = null;
-    let maxSpending = 0;
-
-    for (const [category, amount] of Object.entries(categorySpending)) {
-      if (amount > maxSpending) {
-        maxSpending = amount;
-        topCategory = category;
-      }
+      categorySpending[categoryName] += Math.abs(transaction.amount);
     }
+  });
 
-    const twoWeeksAgo = new Date();
-    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+  let topCategory = null;
+  let maxSpending = 0;
 
-    const lastWeekTransactions = await prisma.transaction.findMany({
-      where: {
-        userId: req.user.userId,
-        date: { gte: twoWeeksAgo, lt: oneWeekAgo },
-      },
-    });
-
-    const thisWeeksTotal = thisWeeksTransactions.reduce((acc, transaction) => acc + transaction.amount, 0);
-    const lastWeekTotal = lastWeekTransactions.reduce((acc, transaction) => acc + transaction.amount, 0);
-
-    let weeklyPercentChange = 0;
-    if (lastWeekTotal > 0) {
-      weeklyPercentChange = Math.round(((thisWeeksTotal - lastWeekTotal) / lastWeekTotal) * 100);
+  for (const [category, amount] of Object.entries(categorySpending)) {
+    if (amount > maxSpending) {
+      maxSpending = amount;
+      topCategory = category;
     }
-
-    res.json({
-      accounts,
-      totalBalance,
-      totalSpent,
-      unassigned,
-      recentTransactions,
-      summary: {
-        topPurchase: topPurchase ? topPurchase.description : "Unknown",
-        topCategory: topCategory || "Unknown",
-        weeklyChangePercent: weeklyPercentChange,
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching dashboard data:", error);
-    res.status(500).json({ error: "Internal Server Error" });
   }
+
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+
+  const lastWeekTransactions = await prisma.transaction.findMany({
+    where: {
+      userId: req.user.userId,
+      date: { gte: twoWeeksAgo, lt: oneWeekAgo },
+    },
+  });
+
+  const thisWeeksTotal = thisWeeksTransactions.reduce((acc, transaction) => acc + transaction.amount, 0);
+  const lastWeekTotal = lastWeekTransactions.reduce((acc, transaction) => acc + transaction.amount, 0);
+
+  let weeklyPercentChange = 0;
+  if (lastWeekTotal > 0) {
+    weeklyPercentChange = Math.round(((thisWeeksTotal - lastWeekTotal) / lastWeekTotal) * 100);
+  }
+
+  res.json({
+    accounts,
+    totalBalance,
+    totalSpent,
+    unassigned,
+    recentTransactions,
+    summary: {
+      topPurchase: topPurchase ? topPurchase.description : "Unknown",
+      topCategory: topCategory || "Unknown",
+      weeklyChangePercent: weeklyPercentChange,
+    },
+  });
 });
 
 app.get("/transactions", verifyAuth, async (req, res) => {
@@ -369,73 +396,62 @@ app.post("/categories", verifyAuth, async (req, res) => {
 
 app.get("/budget/:month", verifyAuth, async (req, res) => {
   const month = req.params.month;
-  try {
-    const budgetMonth = await prisma.budgetMonth.findFirst({
-      where: {
-        month: month,
-        userId: req.user.userId,
-      },
-    });
+  const budgetMonth = await prisma.budgetMonth.findFirst({
+    where: {
+      month: month,
+      userId: req.user.userId,
+    },
+  });
 
-    if (!budgetMonth) {
-      return res.json([]);
-    }
-
-    const items = await prisma.budgetItem.findMany({
-      where: {
-        budgetMonthId: budgetMonth.id,
-      },
-      include: { category: true },
-    });
-
-    res.json(items);
-  } catch (error) {
-    console.error("Error fetching budget items:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+  if (!budgetMonth) {
+    return res.json([]);
   }
+
+  const items = await prisma.budgetItem.findMany({
+    where: {
+      budgetMonthId: budgetMonth.id,
+    },
+    include: { category: true },
+  });
+
+  res.json(items);
 });
 
 app.post("/user/onboarding", verifyAuth, async (req, res) => {
   const { name, accounts, categories } = req.body;
-  try {
-    await prisma.user.update({
-      where: { id: req.user.userId },
-      data: {
-        name,
-      },
-    });
 
-    if (accounts && accounts.length > 0) {
-      for (const account of accounts) {
-        await prisma.account.create({
-          data: { name: account.name, balance: account.balance, userId: req.user.userId },
-        });
-      }
-    }
+  await prisma.user.update({
+    where: { id: req.user.userId },
+    data: { name },
+  });
 
-    if (categories && categories.length > 0) {
-      for (const category of categories) {
-        await prisma.category.create({
-          data: { name: category.name, group: category.group || "Other", userId: req.user.userId },
-        });
-      }
-    }
-
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const existingBudgetMonth = await prisma.budgetMonth.findFirst({
-      where: { month: currentMonth, userId: req.user.userId },
-    });
-
-    if (!existingBudgetMonth) {
-      await prisma.budgetMonth.create({
-        data: { month: currentMonth, userId: req.user.userId },
+  if (accounts && accounts.length > 0) {
+    for (const account of accounts) {
+      await prisma.account.create({
+        data: { name: account.name, balance: account.balance, userId: req.user.userId },
       });
     }
-    res.status(200).json({ message: "Onboarding completed successfully" });
-  } catch (error) {
-    console.error("Error during onboarding:", error);
-    res.status(500).json({ error: "Internal server error" });
   }
+
+  if (categories && categories.length > 0) {
+    for (const category of categories) {
+      await prisma.category.create({
+        data: { name: category.name, group: category.group || "Other", userId: req.user.userId },
+      });
+    }
+  }
+
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const existingBudgetMonth = await prisma.budgetMonth.findFirst({
+    where: { month: currentMonth, userId: req.user.userId },
+  });
+
+  if (!existingBudgetMonth) {
+    await prisma.budgetMonth.create({
+      data: { month: currentMonth, userId: req.user.userId },
+    });
+  }
+  res.status(200).json({ message: "Onboarding completed successfully" });
 });
 
 app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
@@ -530,26 +546,21 @@ app.post("/budget/:month/categories/:id", verifyAuth, async (req, res) => {
 });
 
 app.delete("/budget/reset", verifyAuth, async (req, res) => {
-  try {
-    const month = new Date().toISOString().slice(0, 7);
-    const budgetMonth = await prisma.budgetMonth.findFirst({
-      where: { userId: req.user.userId, month },
+  const month = new Date().toISOString().slice(0, 7);
+  const budgetMonth = await prisma.budgetMonth.findFirst({
+    where: { userId: req.user.userId, month },
+  });
+
+  if (budgetMonth) {
+    await prisma.budgetItem.deleteMany({
+      where: { budgetMonthId: budgetMonth.id },
     });
-
-    if (budgetMonth) {
-      await prisma.budgetItem.deleteMany({
-        where: { budgetMonthId: budgetMonth.id },
-      });
-      await prisma.budgetMonth.delete({
-        where: { id: budgetMonth.id },
-      });
-    }
-
-    res.json({ message: "Budget data reset for current month" });
-  } catch (error) {
-    console.error("Error resetting budget:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    await prisma.budgetMonth.delete({
+      where: { id: budgetMonth.id },
+    });
   }
+
+  res.json({ message: "Budget data reset for current month" });
 });
 
 app.post("/budget/:month/rollover", verifyAuth, async (req, res) => {
@@ -612,36 +623,28 @@ app.post("/budget/:month/rollover", verifyAuth, async (req, res) => {
 app.patch("/categories/:id", [verifyAuth, verifyAccountOwner], async (req, res) => {
   const { name, group } = req.body;
   const categoryId = Number(req.params.id);
-  try {
-    const category = await prisma.category.update({
-      where: { id: categoryId },
-      data: { name, group },
-    });
-    res.json(category);
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+  const category = await prisma.category.update({
+    where: { id: categoryId },
+    data: { name, group },
+  });
+  res.json(category);
 });
 
 app.delete("/categories/:id", [verifyAuth, verifyAccountOwner], async (req, res) => {
   const categoryId = Number(req.params.id);
-  try {
-    const transactionsUsingCategory = await prisma.transaction.count({
-      where: { categoryId },
-    });
-    const budgetItemsUsingCategory = await prisma.budgetItem.count({
-      where: { categoryId },
-    });
-    if (transactionsUsingCategory > 0 || budgetItemsUsingCategory > 0) {
-      return res.status(400).json({ error: "Cannot delete category with transactions or budget items" });
-    }
-    await prisma.category.delete({
-      where: { id: categoryId },
-    });
-    res.json({ message: "Category deleted" });
-  } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
+  const transactionsUsingCategory = await prisma.transaction.count({
+    where: { categoryId },
+  });
+  const budgetItemsUsingCategory = await prisma.budgetItem.count({
+    where: { categoryId },
+  });
+  if (transactionsUsingCategory > 0 || budgetItemsUsingCategory > 0) {
+    return res.status(400).json({ error: "Cannot delete category with transactions or budget items" });
   }
+  await prisma.category.delete({
+    where: { id: categoryId },
+  });
+  res.json({ message: "Category deleted" });
 });
 
 app.get("/goals", verifyAuth, async (req, res) => {
@@ -798,7 +801,7 @@ app.patch("/user/preferences", verifyAuth, async (req, res) => {
     ...(notifications !== undefined && { notifications }),
   };
 
-  const user = await prisma.user.update({
+  await prisma.user.update({
     where: { id: req.user.userId },
     data: { preferences: updatedPreferences },
   });
@@ -847,66 +850,55 @@ app.get("/user/profile", verifyAuth, async (req, res) => {
 });
 
 app.patch("/user/profile", verifyAuth, upload.single("profilePicture"), async (req, res) => {
-  try {
-    const { name } = req.body;
-    const updateData = {};
+  const { name } = req.body;
+  const updateData = {};
 
-    if (name !== undefined) updateData.name = name;
-    if (req.file) {
-      const currentUser = await prisma.user.findUnique({
-        where: { id: req.user.userId },
-        select: { profilePicture: true },
-      });
-      if (currentUser.profilePicture) {
-        const oldFilePath = currentUser.profilePicture.replace("/uploads/", "");
-        const fullPath = path.join("uploads", oldFilePath);
-        if (fs.existsSync(fullPath)) {
-          fs.unlinkSync(fullPath);
-        }
-      }
-      updateData.profilePicture = `/uploads/${req.file.path.replace("uploads/", "")}`;
-    }
-    const user = await prisma.user.update({
-      where: { id: req.user.userId },
-      data: updateData,
-      select: { email: true, name: true, preferences: true, profilePicture: true },
-    });
-    res.json({ message: "Updates profile pic", user });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to update profile" });
-  }
-});
-
-app.delete("/user/profile-picture", verifyAuth, async (req, res) => {
-  try {
-    const user = await prisma.user.findUnique({
+  if (name !== undefined) updateData.name = name;
+  if (req.file) {
+    const currentUser = await prisma.user.findUnique({
       where: { id: req.user.userId },
       select: { profilePicture: true },
     });
-    if (user.profilePicture) {
-      const filePath = user.profilePicture.replace("/uploads/", "");
-      const fullPath = path.join("uploads", filePath);
+    if (currentUser.profilePicture) {
+      const oldFilePath = currentUser.profilePicture.replace("/uploads/", "");
+      const fullPath = path.join("uploads", oldFilePath);
       if (fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath);
       }
-
-      await prisma.user.update({
-        where: { id: req.user.userId },
-        data: { profilePicture: null },
-      });
-      res.json({ message: "Profile picture deleted" });
-    } else {
-      res.json({ message: "No profile picture to delete" });
     }
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to delete profile picture" });
+    updateData.profilePicture = `/uploads/${req.file.path.replace("uploads/", "")}`;
+  }
+  const user = await prisma.user.update({
+    where: { id: req.user.userId },
+    data: updateData,
+    select: { email: true, name: true, preferences: true, profilePicture: true },
+  });
+  res.json({ message: "Updates profile pic", user });
+});
+
+app.delete("/user/profile-picture", verifyAuth, async (req, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { profilePicture: true },
+  });
+  if (user.profilePicture) {
+    const filePath = user.profilePicture.replace("/uploads/", "");
+    const fullPath = path.join("uploads", filePath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { profilePicture: null },
+    });
+    res.json({ message: "Profile picture deleted" });
+  } else {
+    res.json({ message: "No profile picture to delete" });
   }
 });
 
 app.use((err, req, res, next) => {
-  console.error(err.stack);
   if (res.headersSent) {
     return next(err);
   }
@@ -914,8 +906,24 @@ app.use((err, req, res, next) => {
 });
 
 if (process.env.NODE_ENV !== "test") {
-  app.listen(process.env.PORT, "0.0.0.0", () => {
-    console.log(`Server is running on port ${process.env.PORT}`);
-  });
+  const port = process.env.PORT || 3000;
+
+  prisma
+    .$connect()
+    .then(() => {
+      const server = app.listen(port, "0.0.0.0", () => {
+        console.log(`Server running on port ${port}`);
+      });
+
+      process.on("SIGTERM", () => {
+        server.close(() => {
+          process.exit(0);
+        });
+      });
+    })
+    .catch((error) => {
+      process.exit(1);
+    });
 }
+
 module.exports = app;
