@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#0D0E14" },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, marginTop: 20 },
   welcomeText: { fontSize: 24, fontWeight: "bold", color: "#E5E5E5", marginBottom: 4 },
-  userName: { fontSize: 28, fontWeight: "600", color: "#E5E5E5", opacity: 0.8, fontStyle: "italic" },
+  userName: { fontSize: 28, fontWeight: "600", color: "#E5E5E5", opacity: 0.8, fontStyle: "italic", paddingTop: 10 },
   emptyList: { alignItems: "center", paddingVertical: 10 },
   changeIndicator: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
   summaryItem: { marginVertical: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
