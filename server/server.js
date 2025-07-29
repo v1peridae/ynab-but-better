@@ -37,8 +37,10 @@ if (process.env.NODE_ENV !== "test") {
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "ok",
-    message: "Server is starting up",
+    message: "Server is running",
     timestamp: new Date().toISOString(),
+    port: process.env.PORT || 3000,
+    environment: process.env.NODE_ENV || "development",
   });
 });
 
@@ -957,14 +959,34 @@ if (process.env.NODE_ENV !== "test") {
   console.log("  - DATABASE_URL:", process.env.DATABASE_URL ? "SET" : "NOT SET");
   console.log("  - JWT_SECRET:", process.env.JWT_SECRET ? "SET" : "NOT SET");
 
-  app.listen(port, "0.0.0.0", () => {
-    console.log(`✅ Server is running on port ${port}`);
-    console.log(`🔍 Health check available at: http://localhost:${port}/health`);
-  });
+  // Test database connection before starting server
+  prisma
+    .$connect()
+    .then(() => {
+      console.log("✅ Database connected successfully");
 
-  // Handle server errors
-  app.on("error", (error) => {
-    console.error("❌ Server error:", error);
-  });
+      const server = app.listen(port, "0.0.0.0", () => {
+        console.log(`✅ Server is running on port ${port}`);
+        console.log(`🔍 Health check available at: http://0.0.0.0:${port}/health`);
+        console.log(`🌐 External URL: https://delist-production-b447.up.railway.app`);
+      });
+
+      // Handle server errors
+      server.on("error", (error) => {
+        console.error("❌ Server error:", error);
+      });
+
+      // Graceful shutdown
+      process.on("SIGTERM", () => {
+        console.log("SIGTERM received, shutting down gracefully");
+        server.close(() => {
+          console.log("Process terminated");
+        });
+      });
+    })
+    .catch((error) => {
+      console.error("❌ Failed to connect to database:", error);
+      process.exit(1);
+    });
 }
 module.exports = app;
