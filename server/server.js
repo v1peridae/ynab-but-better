@@ -18,7 +18,7 @@ if (process.env.NODE_ENV !== "test") {
   app.use(helmet());
   app.use(
     cors({
-      origin: process.env.FRONTEND_URL,
+      origin: true,
       credentials: true,
     })
   );
@@ -956,7 +956,6 @@ if (process.env.NODE_ENV !== "test") {
   console.log("  - NODE_ENV:", process.env.NODE_ENV);
   console.log("  - DATABASE_URL:", process.env.DATABASE_URL ? "SET" : "NOT SET");
   console.log("  - JWT_SECRET:", process.env.JWT_SECRET ? "SET" : "NOT SET");
-  console.log("  - FRONTEND_URL:", process.env.FRONTEND_URL ? "SET" : "NOT SET");
 
   app.listen(port, "0.0.0.0", () => {
     console.log(`✅ Server is running on port ${port}`);
